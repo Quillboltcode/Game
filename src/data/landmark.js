@@ -9,7 +9,8 @@ export const landmarks = [
     width: 120,
     height: 100,
     color: 0x8B4513,
-    year: '1070 AD'
+    year: '1070 AD',
+    sprite: 'bgpadoda.png'
   },
   {
     id: 'hoan-kiem-lake',
@@ -20,7 +21,8 @@ export const landmarks = [
     width: 200,
     height: 80,
     color: 0x4682B4,
-    year: '15th Century'
+    year: '15th Century',
+    sprite: 'bglake.png'
   },
   {
     id: 'one-pillar-pagoda',
@@ -31,7 +33,8 @@ export const landmarks = [
     width: 80,
     height: 120,
     color: 0xDAA520,
-    year: '1049 AD'
+    year: '1049 AD',
+    sprite: 'bgpagoda.png'
   },
   {
     id: 'hanoi-opera-house',
@@ -42,7 +45,8 @@ export const landmarks = [
     width: 150,
     height: 110,
     color: 0xB8860B,
-    year: '1911 AD'
+    year: '1911 AD',
+    sprite: 'bgopera.png'
   },
   {
     id: 'long-bien-bridge',
@@ -53,6 +57,7 @@ export const landmarks = [
     width: 300,
     height: 90,
     color: 0x708090,
-    year: '1903 AD'
+    year: '1903 AD',
+    sprite: 'bguni.png'
   }
 ];

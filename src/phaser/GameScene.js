@@ -14,6 +14,11 @@ export class GameScene extends Phaser.Scene {
     this.gameUI = null;
     this.onLandmarkInteraction = null;
     this.backgroundMusic = null;
+
+    // Parallax background layers
+    this.skyLayer = null;
+    this.mountainLayer = null;
+    this.treeLayer = null;
   }
 
   setLandmarkCallback(callback) {
@@ -22,32 +27,77 @@ export class GameScene extends Phaser.Scene {
 
   preload() {
     // Load assets from src/asset folder
-    this.load.image('player', 'src/assets/player2.png');
-    this.load.audio('backgroundMusic', 'src/assets/music.mp3');
+    this.load.image('player', 'assets/player2.png');
+    this.load.audio('backgroundMusic', 'assets/music.mp3');
+
+        // Load images for parallax effect
+    // Replace with your actual asset paths and names
+    this.load.image('sky_bg', 'assets/bglake2.png');
+    this.load.image('mountains_bg', 'assets/grasslake.png');
+    this.load.image('trees_fg', 'assets/midlake.png');
 
     // Create landmark textures
     landmarks.forEach(landmark => {
+      if (landmark.sprite) {
+        console.log(`Loading landmark sprite: ${landmark.sprite}`);
+        this.load.image(landmark.id, `src/assets/${landmark.sprite}`);
+      } else {
+      console.log(`Creating landmark rectangle: ${landmark.id} with color ${landmark.color}`);
+      // load template textures for landmarks
       this.add.graphics()
         .fillStyle(landmark.color)
         .fillRect(0, 0, landmark.width, landmark.height)
-        .generateTexture(landmark.id, landmark.width, landmark.height);
+        .generateTexture(landmark.id, landmark.width, landmark.height);}
     });
 
     // Create background elements
-    this.add.graphics()
-      .fillStyle(0x8FBC8F)
-      .fillRect(0, 0, 32, 32)
-      .generateTexture('ground', 32, 32);
+    // Temp bg
+    // Create ground texture (if not already loaded elsewhere or if you prefer dynamic)
+    if (!this.textures.exists('ground')) {
+      this.add.graphics()
+        .fillStyle(0x8FBC8F) // A green color for the ground
+        .fillRect(0, 0, 32, 32)
+        .generateTexture('ground', 32, 32);
+    }
   }
 
   create() {
     // Create world bounds
-    this.physics.world.setBounds(0, 0, 4000, 600);
+    // game dimensions for convenience
+    const gameWidth = this.scale.width;
+    const gameHeight = this.scale.height;
+    const worldWidth = 4000; // Your defined world width
+
+    // Create world bounds
+    this.physics.world.setBounds(0, 0, worldWidth, gameHeight)
+    // --- Parallax Background Layers ---
+    // Sky (furthest back, moves slowest or not at all with camera)
+    // We use a TileSprite so the image can repeat if it's smaller than the world.
+    // Its width should be the game's viewport width, and it's fixed by scrollFactor(0).
+    // We then manually scroll its tilePositionX.
+    this.skyLayer = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'sky_bg')
+      .setOrigin(0, 0)
+      .setScrollFactor(0) // Stays fixed with the camera viewport
+      .setScale(0.5)
+      .setDepth(-5);    // Furthest back
+    
+    // Mountains (middle layer)
+    this.mountainLayer = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'mountains_bg')
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(-4);  // In front of sky
+
+    // Trees (closer layer)
+    this.treeLayer = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'trees_fg')
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(-3);    
 
     // Create sky gradient background
-    const graphics = this.add.graphics();
-    graphics.fillGradientStyle(0x87CEEB, 0x87CEEB, 0x98FB98, 0x98FB98);
-    graphics.fillRect(0, 0, 4000, 600);
+    // The old gradient background is no longer needed
+    // const graphics = this.add.graphics();
+    // graphics.fillGradientStyle(0x87CEEB, 0x87CEEB, 0x98FB98, 0x98FB98);
+    // graphics.fillRect(0, 0, 4000, 600);
 
     // Create ground
     const ground = this.physics.add.staticGroup();
@@ -64,22 +114,38 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, ground);
 
     // Start background music
-    this.backgroundMusic = this.sound.add('backgroundMusic', {
-      loop: true,
-      volume: 0.5
-    });
-    this.backgroundMusic.play();
+    if (this.sound.get('backgroundMusic') === null) { // Play only if not already playing (e.g. scene restart)
+        this.backgroundMusic = this.sound.add('backgroundMusic', {
+            loop: true,
+            volume: 0.5
+        });
+        // Ensure audio context is resumed on user interaction if needed
+        if (this.sound.locked) {
+            this.sound.once(Phaser.Sound.Events.UNLOCKED, () => {
+                this.backgroundMusic.play();
+            });
+        } else {
+            this.backgroundMusic.play();
+        }
+    }
 
     // Create landmarks
     this.landmarksGroup = this.add.group(); // Use the renamed variable
     landmarks.forEach(landmark => {
-      const landmarkSprite = this.add.rectangle(
-        landmark.x + landmark.width / 2,
-        500 - landmark.height / 2, // Adjusted y to place on ground
-        landmark.width,
-        landmark.height,
-        landmark.color
-      );
+      let landmarkSprite;
+      if (landmark.sprite) {
+        landmarkSprite = this.physics.add.staticImage(landmark.x, 550 - landmark.height, landmark.id).setOrigin(0, 1);
+        // Scale the sprite to match landmark dimensions img too big
+      landmarkSprite.setDisplaySize(landmark.width, landmark.height);
+      } else {
+        landmarkSprite = this.add.rectangle(
+          landmark.x + landmark.width / 2,
+          500 - landmark.height / 2, // Adjusted y to place on ground
+          landmark.width,
+          landmark.height,
+          landmark.color
+        )
+      };
       // Instead of using texture, we directly use the rectangle.
       // If you were using images:
       // const landmarkSprite = this.physics.add.staticImage(landmark.x, 550 - landmark.height, landmark.id).setOrigin(0,1);
@@ -156,13 +222,19 @@ export class GameScene extends Phaser.Scene {
       const interactionRadius = (landmarkData.width / 2) + 50;
       if (distance < interactionRadius) {
         this.nearbyLandmarkData = landmarkData;
+        console.log(`Nearby landmark: ${landmarkData.name}`);
       }
     });
 
     // Update UI
     if (this.nearbyLandmarkData) {
       this.interactionText.setText('Press SPACE to learn more');
+      //     this.input.keyboard.on('keydown-SPACE', () => {
+      // console.log('Space pressed, nearbyLandmark:', this.nearbyLandmarkData); // Debug log
+      // console.log('Callback exists:', !!this.onLandmarkInteraction); });
+      this.interactionText.setPosition(this.player.x - 50, this.player.y - 100); // Position above player
       this.interactionText.setVisible(true);
+
     } else {
       this.interactionText.setVisible(false);
     }
@@ -173,6 +245,29 @@ export class GameScene extends Phaser.Scene {
     this.gameUI.setText(`Distance: ${distance}m | Landmarks: ${landmarksVisited}/${landmarks.length}`);
   }
 
+    // Clean up when scene is destroyed or shut down
+  shutdown() {
+    if (this.backgroundMusic && this.backgroundMusic.isPlaying) {
+      this.backgroundMusic.stop();
+    }
+    // Remove keyboard listeners to prevent memory leaks if scene is restarted
+    this.input.keyboard.off('keydown-SPACE');
+
+    // It's good practice to destroy game objects if the scene might be restarted,
+    // though Phaser often handles this. TileSprites, groups, etc.
+    if (this.skyLayer) this.skyLayer.destroy();
+    if (this.mountainLayer) this.mountainLayer.destroy();
+    if (this.treeLayer) this.treeLayer.destroy();
+    if (this.landmarksGroup) this.landmarksGroup.destroy(true); // true to destroy children
+    if (this.player) this.player.destroy();
+    //Texts
+    if(this.interactionText) this.interactionText.destroy();
+    if(this.gameUI) this.gameUI.destroy();
+
+  }
+    // Phaser calls destroy on scene shutdown, which in turn calls shutdown.
+  // Explicitly defining destroy might be for overriding specific Phaser behavior or for plugin needs.
+  // Generally, shutdown() is the place for your cleanup logic.
   // Clean up when scene is destroyed
   destroy() {
     if (this.backgroundMusic) {
