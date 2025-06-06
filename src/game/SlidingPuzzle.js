@@ -5,11 +5,11 @@ import { EventBus } from './EventBus';
 export class SlidingPuzzle extends Phaser.Scene {
     constructor() {
         super({ key: 'SlidingPuzzleScene' });
-        this.gridSize = 4;
+        this.gridSize = 3;
         this.tileSize = 80;
         this.gap = 2;
         this.tiles = [];
-        this.emptyIndex = 15; // Bottom right corner
+        this.emptyIndex = 8; // Bottom right corner
         this.moves = 0;
         this.isComplete = false;
         this.startTime = 0;
@@ -104,7 +104,7 @@ export class SlidingPuzzle extends Phaser.Scene {
             const tileHeight = sourceHeight / this.gridSize;
 
             // Create tiles from the main image
-            for (let i = 0; i < 15; i++) {
+            for (let i = 0; i < 8; i++) {
                 const row = Math.floor(i / this.gridSize);
                 const col = i % this.gridSize;
 
@@ -158,7 +158,7 @@ export class SlidingPuzzle extends Phaser.Scene {
 
     createNumberedTiles() {
         // Fallback numbered tiles if image fails
-        for (let i = 1; i <= 15; i++) {
+        for (let i = 1; i <= 8; i++) {
             const graphics = this.add.graphics();
 
             // Tile background with gradient effect
@@ -206,13 +206,13 @@ export class SlidingPuzzle extends Phaser.Scene {
         }
 
         // Initialize tiles array with correct positions (1-15, then empty)
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < 9; i++) {
             const row = Math.floor(i / this.gridSize);
             const col = i % this.gridSize;
             const x = startX + col * (this.tileSize + this.gap);
             const y = startY + row * (this.tileSize + this.gap);
 
-            if (i < 15) {
+            if (i < 8) {
                 // Image tiles
                 const tileKey = `image_tile_${i + 1}`;
 

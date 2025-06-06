@@ -1,8 +1,9 @@
-// src/phaser/GameScene.js
+// Enhanced GameScene.js with Parallax Background and Minimap
 import Phaser from 'phaser';
 import { EventBus } from './EventBus';
-import { landmarks } from '../data/landmark'; // Adjust path if necessary
-import { SlidingPuzzle } from './SlidingPuzzle'; // Adjust path if necessary
+import { landmarks } from '../data/landmark';
+import { SlidingPuzzle } from './SlidingPuzzle';
+
 export class GameScene extends Phaser.Scene {
   constructor() {
     super({ key: 'GameScene' });
@@ -15,8 +16,12 @@ export class GameScene extends Phaser.Scene {
     this.gameUI = null;
     this.backgroundMusic = null;
 
-    // Single background layer
-    this.backgroundLayer = null;
+    // Multiple parallax background layers
+    this.backgroundLayers = [];
+
+    // Minimap
+    this.minimap = null;
+    this.minimapBorder = null;
 
     // Game progress tracking
     this.gameProgress = {
@@ -28,63 +33,336 @@ export class GameScene extends Phaser.Scene {
       lastSaveTime: Date.now()
     };
 
-    // Game completion settings
     this.REQUIRED_VISITS = 5;
     this.gameCompleted = false;
   }
 
   create() {
-
-    // Load saved progress first
     this.loadGameProgress();
 
-    // Create world bounds
     const gameWidth = this.scale.width;
     const gameHeight = this.scale.height;
     const worldWidth = 4000;
 
-    // Set world bounds
     this.physics.world.setBounds(0, 0, worldWidth, gameHeight);
 
-    // Create single background
-    this.createBackground(gameWidth, gameHeight);
+    // Create parallax background with multiple layers
+    this.createParallaxBackground(gameWidth, gameHeight, worldWidth);
 
     if (!this.scene.get('SlidingPuzzleScene')) {
       this.scene.add('SlidingPuzzleScene', SlidingPuzzleScene);
     }
 
-    // Create ground
     this.createGround();
-
-
-    // Create player at saved position
     this.createPlayer();
-
-    // Create landmarks
     this.createLandmarks();
-
-    // Setup controls
     this.setupControls();
-
-    // Create UI elements
     this.createUI();
 
-    // Setup camera
+    // Setup camera and minimap
     this.setupCamera(worldWidth, gameHeight);
+    this.createMinimap(worldWidth, gameHeight);
 
-    // Start background music
     this.startBackgroundMusic();
-
-    // Setup EventBus listeners
     this.setupEventListeners();
-
-    // Auto-save every 30 seconds
     this.setupAutoSave();
 
-    // Emit scene ready event
     EventBus.emit('current-scene-ready', this);
     EventBus.emit('game-scene-loaded');
   }
+
+  createParallaxBackground(gameWidth, gameHeight, worldWidth) {
+    // Create ground texture if not exists
+    if (!this.textures.exists('ground')) {
+      this.add.graphics()
+        .fillStyle(0x8FBC8F)
+        .fillRect(0, 0, 32, 32)
+        .generateTexture('ground', 32, 32);
+    }
+
+    // Create landmark textures for those without sprites
+    landmarks.forEach(landmark => {
+      if (!landmark.sprite && !this.textures.exists(landmark.id)) {
+        this.add.graphics()
+          .fillStyle(landmark.color)
+          .fillRect(0, 0, landmark.width, landmark.height)
+          .generateTexture(landmark.id, landmark.width, landmark.height);
+      }
+    });
+
+    // Create multiple background layers for parallax effect
+    this.backgroundLayers = [];
+
+    // Layer 1: Far background (slowest) - Sky/Mountains
+    const farBg = this.add.tileSprite(0, 0, worldWidth * 2, gameHeight, 'sky_bg')
+      .setOrigin(0, 0)
+      .setScrollFactor(0.1) // Very slow movement
+      .setDepth(-10);
+    this.backgroundLayers.push({ sprite: farBg, speed: 0.1 });
+
+    // Layer 2: Mid background - Clouds/Hills
+    if (this.textures.exists('clouds_bg')) {
+      const midBg = this.add.tileSprite(0, 0, worldWidth * 1.5, gameHeight, 'clouds_bg')
+        .setOrigin(0, 0)
+        .setScrollFactor(0.3)
+        .setDepth(-8);
+      this.backgroundLayers.push({ sprite: midBg, speed: 0.3 });
+    }
+
+    // Layer 3: Near background - Trees/Rocks
+    if (this.textures.exists('trees_bg')) {
+      const nearBg = this.add.tileSprite(0, 0, worldWidth * 1.2, gameHeight, 'trees_bg')
+        .setOrigin(0, 0)
+        .setScrollFactor(0.6)
+        .setDepth(-6);
+      this.backgroundLayers.push({ sprite: nearBg, speed: 0.6 });
+    }
+
+    // Create procedural background elements (like stars in the example)
+    this.createBackgroundElements(worldWidth, gameHeight);
+
+    console.log('Parallax background layers created:', this.backgroundLayers.length);
+  }
+
+  createBackgroundElements(worldWidth, gameHeight) {
+    // Create floating elements similar to the starfield example
+    // These could be clouds, birds, floating leaves, etc.
+
+    // Create a group for background elements
+    const bgElementsGroup = this.add.group();
+
+    // Generate floating elements
+    for (let i = 0; i < 50; i++) {
+      // Create simple cloud-like elements
+      const element = this.add.graphics();
+      element.fillStyle(0xffffff, 0.3);
+      element.fillCircle(0, 0, Phaser.Math.Between(10, 30));
+
+      // Random position across the world
+      element.x = Phaser.Math.Between(0, worldWidth);
+      element.y = Phaser.Math.Between(50, gameHeight - 200);
+
+      // Different scroll factors for depth
+      const scrollFactor = Phaser.Math.FloatBetween(0.2, 0.8);
+      element.setScrollFactor(scrollFactor);
+      element.setDepth(-5);
+
+      bgElementsGroup.add(element);
+
+      // Ignore these elements in the minimap
+      if (this.minimap) {
+        this.minimap.ignore(element);
+      }
+    }
+
+    // Store reference for minimap setup
+    this.backgroundElements = bgElementsGroup;
+  }
+
+  createMinimap(worldWidth, gameHeight) {
+    // Create minimap similar to the example
+    const minimapWidth = 300;
+    const minimapHeight = 80;
+    const minimapX = this.scale.width - minimapWidth - 10;
+    const minimapY = 10;
+
+    // Calculate zoom to fit entire world in minimap
+    const zoomX = minimapWidth / worldWidth;
+    const zoomY = minimapHeight / gameHeight;
+    const minimapZoom = Math.min(zoomX, zoomY);
+
+    // Create minimap camera
+    this.minimap = this.cameras.add(minimapX, minimapY, minimapWidth, minimapHeight)
+      .setZoom(minimapZoom)
+      .setName('minimap');
+
+    this.minimap.setBackgroundColor(0x222222);
+    this.minimap.setBounds(0, 0, worldWidth, gameHeight);
+
+    // Ignore UI elements in minimap
+    this.minimap.ignore([this.interactionText, this.gameUI]);
+
+    // Ignore background elements in minimap
+    if (this.backgroundElements) {
+      this.backgroundElements.children.entries.forEach(element => {
+        this.minimap.ignore(element);
+      });
+    }
+
+    // Ignore parallax backgrounds in minimap (they would look weird)
+    this.backgroundLayers.forEach(layer => {
+      this.minimap.ignore(layer.sprite);
+    });
+
+    // Create minimap border
+    this.minimapBorder = this.add.graphics()
+      .lineStyle(2, 0xffffff, 1)
+      .strokeRect(minimapX - 2, minimapY - 2, minimapWidth + 4, minimapHeight + 4)
+      .setScrollFactor(0)
+      .setDepth(1000);
+
+    // Add minimap label
+    this.add.text(minimapX, minimapY - 20, 'Map', {
+      fontSize: '14px',
+      color: '#ffffff',
+      fontWeight: 'bold'
+    }).setOrigin(0, 1).setScrollFactor(0).setDepth(1000);
+
+    console.log('Minimap created at:', minimapX, minimapY);
+  }
+
+  update() {
+    // Player movement
+    const speed = this.playerSpeed || 200;
+
+    if (this.cursors.left?.isDown || this.wasd.A?.isDown) {
+      this.player.setVelocityX(-speed);
+      // Change to running sprite and flip for left movement
+      this.player.setTexture('player_run');
+      this.player.setFlipX(true);
+    } else if (this.cursors.right?.isDown || this.wasd.D?.isDown) {
+      this.player.setVelocityX(speed);
+      // Change to running sprite, no flip for right movement
+      this.player.setTexture('player_run');
+      this.player.setFlipX(false);
+    } else {
+      this.player.setVelocityX(0);
+      // Change back to idle sprite when not moving
+      this.player.setTexture('player');
+      this.player.setFlipX(false);
+    }
+
+    if ((this.cursors.up?.isDown || this.wasd.W?.isDown || this.cursors.space?.isDown) && this.player.body?.touching.down) {
+      this.player.setVelocityY(-500);
+      EventBus.emit('player-jumped');
+    }
+
+    // Update minimap to follow player
+    if (this.minimap && this.player) {
+      // Center minimap on player with some boundaries
+      const minimapCenterX = this.player.x - (this.minimap.width / this.minimap.zoom) / 2;
+      const minimapCenterY = this.player.y - (this.minimap.height / this.minimap.zoom) / 2;
+
+      // Clamp to world bounds
+      this.minimap.scrollX = Phaser.Math.Clamp(minimapCenterX, 0, 4000 - (this.minimap.width / this.minimap.zoom));
+      this.minimap.scrollY = Phaser.Math.Clamp(minimapCenterY, 0, 600 - (this.minimap.height / this.minimap.zoom));
+    }
+
+    // Update parallax background layers based on camera movement
+    this.updateParallaxLayers();
+
+    this.checkNearbyLandmarks();
+    this.updateUI();
+
+    EventBus.emit('player-position-update', {
+      x: this.player.x,
+      y: this.player.y,
+      velocity: {
+        x: this.player.body.velocity.x,
+        y: this.player.body.velocity.y
+      }
+    });
+  }
+
+  updateParallaxLayers() {
+    // Update tileSprite positions based on camera scroll for enhanced parallax effect
+    const cameraX = this.cameras.main.scrollX;
+
+    this.backgroundLayers.forEach(layer => {
+      // Move the tile sprite based on camera movement and layer speed
+      layer.sprite.tilePositionX = cameraX * layer.speed;
+    });
+  }
+
+  // Add method to toggle minimap visibility
+  toggleMinimap() {
+    if (this.minimap) {
+      this.minimap.setVisible(!this.minimap.visible);
+      this.minimapBorder.setVisible(!this.minimapBorder.visible);
+    }
+  }
+
+  // Enhanced setup controls with minimap toggle
+  setupControls() {
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.wasd = this.input.keyboard.addKeys('W,S,A,D');
+
+    // Space key for interaction
+    this.input.keyboard.on('keydown-SPACE', () => {
+      if (this.nearbyLandmarkData) {
+        if (!this.gameProgress.landmarksVisited.includes(this.nearbyLandmarkData.id)) {
+          this.gameProgress.landmarksVisited.push(this.nearbyLandmarkData.id);
+          console.log(`Landmark visited: ${this.nearbyLandmarkData.name}`);
+          this.checkGameCompletion();
+        }
+
+        EventBus.emit('landmark-interaction', this.nearbyLandmarkData);
+        this.launchSlidingPuzzle(this.nearbyLandmarkData);
+      }
+    });
+
+    // Manual save key (S key)
+    this.input.keyboard.on('keydown-S', () => {
+      this.saveGameProgress();
+    });
+
+    // Reset progress key (Shift+R)
+    this.input.keyboard.on('keydown-R', () => {
+      if (this.input.keyboard.checkDown(this.input.keyboard.addKey('SHIFT'))) {
+        this.resetGameProgress();
+        this.scene.restart();
+      }
+    });
+
+    // Toggle minimap (M key)
+    this.input.keyboard.on('keydown-M', () => {
+      this.toggleMinimap();
+    });
+  }
+
+  shutdown() {
+    // Clean up EventBus listeners
+    EventBus.off('pause-game', this.pauseGame, this);
+    EventBus.off('resume-game', this.resumeGame, this);
+    EventBus.off('toggle-music', this.toggleMusic, this);
+    EventBus.off('player-boost', this.boostPlayer, this);
+
+    if (this.backgroundMusic && this.backgroundMusic.isPlaying) {
+      this.backgroundMusic.stop();
+    }
+
+    this.input.keyboard.off('keydown-SPACE');
+    this.input.keyboard.off('keydown-M');
+
+    // Destroy parallax backgrounds
+    this.backgroundLayers.forEach(layer => {
+      if (layer.sprite) layer.sprite.destroy();
+    });
+    this.backgroundLayers = [];
+
+    // Destroy minimap
+    if (this.minimap) {
+      this.cameras.remove(this.minimap);
+      this.minimap = null;
+    }
+    if (this.minimapBorder) {
+      this.minimapBorder.destroy();
+      this.minimapBorder = null;
+    }
+
+    // Destroy other elements
+    if (this.backgroundElements) this.backgroundElements.destroy(true);
+    if (this.landmarksGroup) this.landmarksGroup.destroy(true);
+    if (this.player) this.player.destroy();
+    if (this.interactionText) this.interactionText.destroy();
+    if (this.gameUI) this.gameUI.destroy();
+
+    EventBus.emit('game-scene-shutdown');
+    super.shutdown();
+  }
+
+  // Keep all your existing methods (saveGameProgress, loadGameProgress, etc.)
+  // ... [Include all your other existing methods here]
 
   saveGameProgress() {
     const saveData = {
@@ -107,8 +385,6 @@ export class GameScene extends Phaser.Scene {
       localStorage.setItem('gameProgress', JSON.stringify(saveData));
       console.log('Game progress saved:', saveData);
       EventBus.emit('game-saved', saveData);
-      
-      // Show save indicator
       this.showSaveIndicator();
     } catch (error) {
       console.error('Failed to save game progress:', error);
@@ -132,7 +408,6 @@ export class GameScene extends Phaser.Scene {
       }
     } catch (error) {
       console.error('Failed to load game progress:', error);
-      // Reset to default if corrupted
       this.resetGameProgress();
     }
   }
@@ -151,66 +426,24 @@ export class GameScene extends Phaser.Scene {
     EventBus.emit('game-reset');
   }
 
-
-  createBackground(gameWidth, gameHeight) {
-    // Create ground texture if not exists
-    if (!this.textures.exists('ground')) {
-      this.add.graphics()
-        .fillStyle(0x8FBC8F)
-        .fillRect(0, 0, 32, 32)
-        .generateTexture('ground', 32, 32);
-    }
-
-    // Create landmark textures for those without sprites
-    landmarks.forEach(landmark => {
-      if (!landmark.sprite && !this.textures.exists(landmark.id)) {
-        this.add.graphics()
-          .fillStyle(landmark.color)
-          .fillRect(0, 0, landmark.width, landmark.height)
-          .generateTexture(landmark.id, landmark.width, landmark.height);
-      }
-    });
-
-    // Single background layer - static, no parallax
-    this.backgroundLayer = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'sky_bg')
-      .setOrigin(0, 0)
-      .setScrollFactor(0)
-      .setDepth(-5);
-    
-    console.log('Single background layer created', this.backgroundLayer);
-  }
-
   createGround() {
     const ground = this.physics.add.staticGroup();
     for (let x = 0; x < 4000; x += 32) {
       ground.create(x, 568, 'ground').setOrigin(0, 0);
     }
-
-    // Store ground reference for player collision
     this.ground = ground;
   }
 
   createPlayer() {
-
-
-
-
-
-    // Use saved position or default
     const startX = this.gameProgress.playerPosition.x;
     const startY = this.gameProgress.playerPosition.y;
-    
-    this.player = this.physics.add.sprite(startX, startY, 'player').setScale(2.5);
+
+    this.player = this.physics.add.sprite(startX, startY, 'player').setScale(1);
     this.player.setBounce(0.2);
     this.player.setCollideWorldBounds(true);
-
-
-    // Player physics
     this.physics.add.collider(this.player, this.ground);
 
     console.log(`Player created at position: (${startX}, ${startY})`);
-    
-    // Emit player created event
     EventBus.emit('player-created', this.player);
   }
 
@@ -239,34 +472,28 @@ export class GameScene extends Phaser.Scene {
 
       landmarkSprite.setData('landmarkData', landmark);
 
-
-      // Check if landmark is completed
       const isCompleted = this.gameProgress.landmarksCompleted.includes(landmark.id);
       const isVisited = this.gameProgress.landmarksVisited.includes(landmark.id);
 
-      // Visual indicators for landmark status
       let nameColor = '#000000';
       let nameText = landmark.name;
-      
+
       if (isCompleted) {
-        nameColor = '#27ae60'; // Green for completed
+        nameColor = '#27ae60';
         nameText = `✓ ${landmark.name}`;
-        landmarkSprite.setTint(0x90EE90); // Light green tint
+        landmarkSprite.setTint(0x90EE90);
       } else if (isVisited) {
-        nameColor = '#f39c12'; // Orange for visited but not completed
+        nameColor = '#f39c12';
         nameText = `◐ ${landmark.name}`;
-        landmarkSprite.setTint(0xFFE4B5); // Light orange tint
+        landmarkSprite.setTint(0xFFE4B5);
       }
 
-      // Add landmark name text with status
       this.add.text(
         landmark.x + landmark.width / 2,
         500 - landmark.height - 20,
-
         nameText,
         {
           fontSize: '14px',
-
           color: nameColor,
           fontWeight: isCompleted ? 'bold' : 'normal'
         }
@@ -276,73 +503,22 @@ export class GameScene extends Phaser.Scene {
     });
 
     console.log(`Landmarks created. Completed: ${this.gameProgress.landmarksCompleted.length}, Visited: ${this.gameProgress.landmarksVisited.length}`);
-    
-    // Emit landmarks created event
     EventBus.emit('landmarks-created', this.landmarksGroup);
   }
 
-  setupControls() {
-    this.cursors = this.input.keyboard.createCursorKeys();
-    this.wasd = this.input.keyboard.addKeys('W,S,A,D');
-
-    // Space key for interaction
-    this.input.keyboard.on('keydown-SPACE', () => {
-      if (this.nearbyLandmarkData) {
-        // Mark landmark as visited if not already
-        if (!this.gameProgress.landmarksVisited.includes(this.nearbyLandmarkData.id)) {
-          this.gameProgress.landmarksVisited.push(this.nearbyLandmarkData.id);
-          console.log(`Landmark visited: ${this.nearbyLandmarkData.name}`);
-          console.log(`Total visits: ${this.gameProgress.landmarksVisited.length}/${this.REQUIRED_VISITS}`);
-          
-          // Check if player has reached required visits
-          this.checkGameCompletion();
-        }
-
-        EventBus.emit('landmark-interaction', this.nearbyLandmarkData);
-
-
-        this.launchSlidingPuzzle(this.nearbyLandmarkData);
-      }
-    });
-
-    // Manual save key (S key)
-    this.input.keyboard.on('keydown-S', () => {
-      this.saveGameProgress();
-    });
-
-    // Reset progress key (R key) - for testing
-    this.input.keyboard.on('keydown-R', () => {
-      if (this.input.keyboard.checkDown(this.input.keyboard.addKey('SHIFT'))) {
-        this.resetGameProgress();
-        this.scene.restart();
-      }
-    });
-  }
-
   launchSlidingPuzzle(landmarkData) {
-    // Save progress before launching puzzle
     this.saveGameProgress();
-    
-    // Pause the current scene
     this.scene.pause();
     if (this.backgroundMusic && this.backgroundMusic.isPlaying) {
       this.backgroundMusic.pause();
     }
-
-    // Launch the puzzle scene on top
     this.scene.launch('SlidingPuzzleScene', { landmarkData });
     EventBus.emit('puzzle-launched', landmarkData);
   }
 
   setupEventListeners() {
-    // Listen for the puzzle to close so you can resume music
     EventBus.on('puzzle-closed', this.resumeAfterPuzzle, this);
-
-    
-    // Listen for puzzle completion
     EventBus.on('puzzle-completed', this.onPuzzleCompleted, this);
-    
-    // Listen for external events
     EventBus.on('pause-game', this.pauseGame, this);
     EventBus.on('resume-game', this.resumeGame, this);
     EventBus.on('toggle-music', this.toggleMusic, this);
@@ -351,33 +527,26 @@ export class GameScene extends Phaser.Scene {
 
   onPuzzleCompleted(puzzleData) {
     console.log('Puzzle completed:', puzzleData);
-    
-    // Mark landmark as completed if not already
+
     if (this.nearbyLandmarkData && !this.gameProgress.landmarksCompleted.includes(this.nearbyLandmarkData.id)) {
       this.gameProgress.landmarksCompleted.push(this.nearbyLandmarkData.id);
       console.log(`Landmark completed: ${this.nearbyLandmarkData.name}`);
-      
-      // Save progress immediately after completion
+
       this.saveGameProgress();
-      
-      // Show completion message
       this.showLandmarkCompletionMessage(this.nearbyLandmarkData);
-      
-      // Check if game is completed (in case this was the 5th visit)
       this.checkGameCompletion();
     }
   }
 
   showLandmarkCompletionMessage(landmarkData) {
-    const message = this.add.text(this.player.x, this.player.y - 150, 
+    const message = this.add.text(this.player.x, this.player.y - 150,
       `${landmarkData.name} Completed!`, {
-        fontSize: '20px',
-        color: '#27ae60',
-        backgroundColor: '#ffffff',
-        padding: { x: 15, y: 8 }
-      }).setOrigin(0.5);
+      fontSize: '20px',
+      color: '#27ae60',
+      backgroundColor: '#ffffff',
+      padding: { x: 15, y: 8 }
+    }).setOrigin(0.5);
 
-    // Fade out after 3 seconds
     this.tweens.add({
       targets: message,
       alpha: 0,
@@ -392,14 +561,10 @@ export class GameScene extends Phaser.Scene {
     if (this.backgroundMusic && this.backgroundMusic.isPaused) {
       this.backgroundMusic.resume();
     }
-
-    
-    // Refresh landmark visuals to show completion status
     this.refreshLandmarkVisuals();
   }
 
   refreshLandmarkVisuals() {
-    // Destroy and recreate landmarks to update their visual status
     if (this.landmarksGroup) {
       this.landmarksGroup.destroy(true);
     }
@@ -407,9 +572,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   setupAutoSave() {
-    // Auto-save every 30 seconds
     this.time.addEvent({
-      delay: 30000, // 30 seconds
+      delay: 30000,
       callback: this.saveGameProgress,
       callbackScope: this,
       loop: true
@@ -424,7 +588,6 @@ export class GameScene extends Phaser.Scene {
       padding: { x: 8, y: 4 }
     }).setOrigin(1, 0).setScrollFactor(0);
 
-    // Fade out after 2 seconds
     this.tweens.add({
       targets: saveText,
       alpha: 0,
@@ -448,10 +611,18 @@ export class GameScene extends Phaser.Scene {
       backgroundColor: '#000000',
       padding: { x: 10, y: 5 }
     }).setScrollFactor(0);
+
+    // Add minimap toggle instruction
+    this.add.text(16, this.scale.height - 30, 'Press M to toggle minimap', {
+      fontSize: '12px',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 5, y: 3 }
+    }).setScrollFactor(0).setDepth(1000);
   }
 
   setupCamera(worldWidth, gameHeight) {
-    this.cameras.main.startFollow(this.player);
+    this.cameras.main.startFollow(this.player, false, 0.1, 0.1);
     this.cameras.main.setBounds(0, 0, worldWidth, 600);
   }
 
@@ -474,15 +645,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-
-
-
-
-
-
-
-
-  // Event handler methods
   pauseGame() {
     this.scene.pause();
     if (this.backgroundMusic && this.backgroundMusic.isPlaying) {
@@ -512,7 +674,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   boostPlayer(boostData = { speed: 1.5, duration: 3000 }) {
-    // Temporary speed boost
     const originalSpeed = 200;
     const boostedSpeed = originalSpeed * boostData.speed;
 
@@ -524,40 +685,6 @@ export class GameScene extends Phaser.Scene {
     });
 
     EventBus.emit('player-boost-started', boostData);
-  }
-
-  update() {
-    // Player movement
-    const speed = this.playerSpeed || 200;
-
-    if (this.cursors.left?.isDown || this.wasd.A?.isDown) {
-      this.player.setVelocityX(-speed);
-    } else if (this.cursors.right?.isDown || this.wasd.D?.isDown) {
-      this.player.setVelocityX(speed);
-    } else {
-      this.player.setVelocityX(0);
-    }
-
-    if ((this.cursors.up?.isDown || this.wasd.W?.isDown || this.cursors.space?.isDown) && this.player.body?.touching.down) {
-      this.player.setVelocityY(-500);
-      EventBus.emit('player-jumped');
-    }
-
-    // Check for nearby landmarks
-    this.checkNearbyLandmarks();
-
-    // Update UI
-    this.updateUI();
-
-    // Emit player position for external components
-    EventBus.emit('player-position-update', {
-      x: this.player.x,
-      y: this.player.y,
-      velocity: {
-        x: this.player.body.velocity.x,
-        y: this.player.body.velocity.y
-      }
-    });
   }
 
   checkNearbyLandmarks() {
@@ -576,7 +703,6 @@ export class GameScene extends Phaser.Scene {
       if (distance < interactionRadius) {
         this.nearbyLandmarkData = landmarkData;
 
-        // Emit nearby landmark event
         if (!this.lastNearbyLandmark || this.lastNearbyLandmark.id !== landmarkData.id) {
           EventBus.emit('landmark-nearby', landmarkData);
           this.lastNearbyLandmark = landmarkData;
@@ -584,7 +710,6 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    // Emit when no landmark is nearby
     if (!this.nearbyLandmarkData && this.lastNearbyLandmark) {
       EventBus.emit('landmark-left', this.lastNearbyLandmark);
       this.lastNearbyLandmark = null;
@@ -593,12 +718,11 @@ export class GameScene extends Phaser.Scene {
 
   updateUI() {
     if (this.nearbyLandmarkData) {
-
       const isCompleted = this.gameProgress.landmarksCompleted.includes(this.nearbyLandmarkData.id);
-      const interactionText = isCompleted ? 
-        'Already completed!' : 
+      const interactionText = isCompleted ?
+        'Already completed!' :
         'Press SPACE to learn more';
-      
+
       this.interactionText.setText(interactionText);
       this.interactionText.setPosition(this.player.x - 50, this.player.y - 100);
       this.interactionText.setVisible(true);
@@ -606,74 +730,35 @@ export class GameScene extends Phaser.Scene {
       this.interactionText.setVisible(false);
     }
 
-
-
-    // Update game stats with progress and completion status
     const distance = Math.floor(this.player.x / 10);
-
-
     this.gameProgress.totalDistance = Math.max(this.gameProgress.totalDistance, distance);
-    
+
     const landmarksVisited = this.gameProgress.landmarksVisited.length;
     const landmarksCompleted = this.gameProgress.landmarksCompleted.length;
 
-    
-    // Show progress towards completion
-    const progressText = landmarksVisited >= this.REQUIRED_VISITS ? 
-      '🎉 READY FOR QUIZ!' : 
+    const progressText = landmarksVisited >= this.REQUIRED_VISITS ?
+      '🎉 READY FOR QUIZ!' :
       `Progress: ${landmarksVisited}/${this.REQUIRED_VISITS} visits`;
-    
+
     const statsText = `Distance: ${distance}m | Visited: ${landmarksVisited}/${landmarks.length} | Completed: ${landmarksCompleted}/${landmarks.length}\n${progressText}`;
 
     this.gameUI.setText(statsText);
 
-    // Emit stats update
     EventBus.emit('game-stats-update', {
       distance,
       landmarksVisited,
-
       landmarksCompleted,
       totalLandmarks: landmarks.length,
-
       gameProgress: this.gameProgress,
       readyForQuiz: landmarksVisited >= this.REQUIRED_VISITS
     });
   }
 
-  shutdown() {
-    // Clean up EventBus listeners
-    EventBus.off('pause-game', this.pauseGame, this);
-    EventBus.off('resume-game', this.resumeGame, this);
-    EventBus.off('toggle-music', this.toggleMusic, this);
-    EventBus.off('player-boost', this.boostPlayer, this);
-
-    // Clean up music
-    if (this.backgroundMusic && this.backgroundMusic.isPlaying) {
-      this.backgroundMusic.stop();
+  checkGameCompletion() {
+    // Add your game completion logic here
+    if (this.gameProgress.landmarksVisited.length >= this.REQUIRED_VISITS && !this.gameCompleted) {
+      this.gameCompleted = true;
+      EventBus.emit('game-completed', this.gameProgress);
     }
-
-    // Remove keyboard listeners
-    this.input.keyboard.off('keydown-SPACE');
-
-    // Destroy game objects - only single background layer now
-    if (this.backgroundLayer) this.backgroundLayer.destroy();
-    if (this.landmarksGroup) this.landmarksGroup.destroy(true);
-    if (this.player) this.player.destroy();
-    if (this.interactionText) this.interactionText.destroy();
-    if (this.gameUI) this.gameUI.destroy();
-
-    // Emit cleanup complete
-    EventBus.emit('game-scene-shutdown');
-
-    super.shutdown();
-  }
-
-  destroy() {
-    if (this.backgroundMusic) {
-      this.backgroundMusic.stop();
-    }
-
-    EventBus.emit('game-scene-destroyed');
-    super.destroy();
   }
 }
