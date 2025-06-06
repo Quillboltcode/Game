@@ -1,7 +1,14 @@
-import React from 'react'
+import React,{ useEffect} from 'react'
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { PhaserHanoiGame } from './components/PhaserHanoiGame'
+import { Quiz } from './components/Quiz'
 import { Home, Play, Info } from 'lucide-react'
+// import { useRef } from 'react'
+// import { GameScene } from './phaser/GameScene.js';
+// import { PreloadScene } from './phaser/PreloadScene.js';
+// import { WorldMapScene } from './phaser/WorldMapScene.js';
+// import { HoanKiemLakeScene } from './phaser/LakeScence.js';
+// import { TempleOfLiteratureScene } from './phaser/TempleOfLiteratureScene.js';
 
 const HomePage = () => {
   return (
@@ -103,6 +110,13 @@ const App = () => {
               >
                 Play Game
               </Link>
+
+              <Link
+              to="/quiz"
+              className="hover:text-red-200 transition-colors"
+              >
+                Quiz
+              </Link>
             </div>
           </div>
         </nav>
@@ -110,10 +124,82 @@ const App = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/game" element={<PhaserHanoiGame />} />
+          <Route path="/quiz" element={<Quiz />} />
+          {/* Add more routes as needed */}
         </Routes>
       </div>
     </Router>
   )
 }
 
-export default App
+
+// const App = () => {
+//     // Ref to hold the game container div
+//     const gameContainerRef = useRef(null);
+//     // Ref to hold the Phaser game instance
+//     const phaserGameRef = useRef(null);
+
+//     useEffect(() => {
+//         // Only initialize Phaser if the container ref is available and game is not already created
+//         if (gameContainerRef.current && !phaserGameRef.current) {
+//             const config = {
+//                 type: Phaser.AUTO,
+//                 width: 800,
+//                 height: 600,
+//                 parent: gameContainerRef.current, // Use the ref for the parent
+//                 scene: [
+//                     PreloadScene,
+//                     WorldMapScene,
+//                     HoanKiemLakeScene,
+//                     // TempleOfLiteratureScene,
+//                     // LongBienBridgeScene,
+//                     // OnePillarPagodaScene,
+//                     // OldQuarterScene
+//                 ],
+//                 physics: {
+//                     default: 'arcade',
+//                     arcade: {
+//                         gravity: { y: 0 },
+//                         debug: false
+//                     }
+//                 },
+//                 scale: {
+//                     mode: Phaser.Scale.FIT, // This is key for scaling!
+//                     autoCenter: Phaser.Scale.CENTER_BOTH, // This is key for centering!
+//                     parent: gameContainerRef.current, // Ensure parent is correctly set for scaling
+//                     width: 800, // Base game width
+//                     height: 600 // Base game height
+//                 },
+//                 backgroundColor: '#2d2d2d'
+//             };
+
+//             phaserGameRef.current = new Phaser.Game(config);
+//         }
+
+//         // Cleanup function for when the component unmounts
+//         return () => {
+//             if (phaserGameRef.current) {
+//                 phaserGameRef.current.destroy(true); // Destroy the Phaser game instance
+//                 phaserGameRef.current = null;
+//             }
+//         };
+//     }, []); // Empty dependency array ensures this runs once on mount and once on unmount
+
+//     return (
+//         <div className="bg-gray-900 text-white flex justify-center items-center min-h-screen overflow-hidden">
+//             <div
+//                 id="game-container"
+//                 ref={gameContainerRef}
+//                 className="w-full h-full flex justify-center items-center"
+//                 style={{
+//                     borderRadius: '1rem', // Rounded corners for the game canvas
+//                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+//                 }}
+//             ></div>
+//         </div>
+//     );
+// };
+
+export default App;
+
+// export default App
