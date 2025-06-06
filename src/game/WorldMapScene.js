@@ -17,7 +17,7 @@ export class WorldMapScene extends Phaser.Scene {
 
   preload() {
     // Load the world map image
-    this.load.image('world_map', 'assets/world_map.jpg');
+    this.load.image('world_map', 'assets/map/map.jpg');
   }
 
   createLandmarkButton(x, y, text, targetScene, color) {
@@ -80,9 +80,9 @@ export class WorldMapScene extends Phaser.Scene {
 
     // Interactive Landmark Markers
     this.createLandmarkButton(200, 250, 'Temple of Literature', 'TempleOfLiteratureScene', 0xCCFFCC);
-    this.createLandmarkButton(400, 200, 'One Pillar Pagoda', 'OnePillarPagodaScene', 0xFFCCCC);
+    this.createLandmarkButton(200, 500, 'One Pillar Pagoda', 'OnePillarPagodaScene', 0xFFCCCC);
     this.createLandmarkButton(650, 150, 'Long Biên Bridge', 'LongBienBridgeScene', 0xCCDDFF);
-    this.createLandmarkButton(200, 500, 'Hoàn Kiếm Lake', 'HoanKiemLakeScene', 0xFFFFCC);
+    this.createLandmarkButton(400, 200, 'Hoàn Kiếm Lake', 'HoanKiemLakeScene', 0xFFFFCC);
     this.createLandmarkButton(600, 450, 'Old Quarter', 'OldQuarterScene', 0xCCCCFF);
     
     // Add button to go to your existing GameScene

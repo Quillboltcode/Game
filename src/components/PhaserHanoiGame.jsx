@@ -56,9 +56,24 @@ export const PhaserHanoiGame = () => {
         EventBus.emit('resume-game');
     };
     
+    // Clear game progress from localStorage
+    const clearGameProgress = () => {
+        try {
+            localStorage.removeItem('gameProgress');
+            console.log('Game progress cleared from localStorage');
+            EventBus.emit('game-progress-cleared');
+        } catch (error) {
+            console.error('Failed to clear game progress:', error);
+        }
+    };
+    
     // Callback to start the game
     const handleStartGame = () => {
+        // Clear any existing game progress when starting a new game
+        clearGameProgress();
+        
         setGameStarted(true);
+        console.log('New game started - progress cleared');
     };
     
     // Handle music toggle (example of external control)
@@ -223,7 +238,8 @@ export const PhaserHanoiGame = () => {
             {/* Instructions */}
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-black bg-opacity-70 text-white p-3 rounded-lg text-center">
                 <div className="text-sm">
-                    <div>Use ARROW KEYS or WASD to move • SPACE to jump or interact</div>
+                    <div>Use ARROW KEYS or WASD to move • Double SPACE to jump or interact</div>
+                    <div>Use S to save, use P to Pause </div>
                 </div>
             </div>
             

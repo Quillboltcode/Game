@@ -75,9 +75,9 @@ export class Preload extends Scene
         this.load.audio('backgroundMusic', 'assets/music.mp3');
         
         // Parallax background layers
-        this.load.image('sky_bg', 'assets/bglake2.png');
-        this.load.image('mountains_bg', 'assets/grasslake.png');
-        this.load.image('trees_fg', 'assets/midlake.png');
+        this.load.image('sky_bg', './assets/layer/sky.jpg');
+        this.load.image('mountains_bg', 'assets/layer/mount.png');
+        this.load.image('trees_fg', 'assets/tree.png');
 
         // Menu assets (if not already loaded)
         // Load any assets you need for the main menu

@@ -15,10 +15,8 @@ export class GameScene extends Phaser.Scene {
     this.gameUI = null;
     this.backgroundMusic = null;
 
-    // Parallax background layers
-    this.skyLayer = null;
-    this.mountainLayer = null;
-    this.treeLayer = null;
+    // Single background layer
+    this.backgroundLayer = null;
 
     // Game progress tracking
     this.gameProgress = {
@@ -29,9 +27,14 @@ export class GameScene extends Phaser.Scene {
       gameTime: 0,
       lastSaveTime: Date.now()
     };
+
+    // Game completion settings
+    this.REQUIRED_VISITS = 5;
+    this.gameCompleted = false;
   }
 
   create() {
+
     // Load saved progress first
     this.loadGameProgress();
 
@@ -43,8 +46,8 @@ export class GameScene extends Phaser.Scene {
     // Set world bounds
     this.physics.world.setBounds(0, 0, worldWidth, gameHeight);
 
-    // Create parallax background layers
-    this.createParallaxLayers(gameWidth, gameHeight);
+    // Create single background
+    this.createBackground(gameWidth, gameHeight);
 
     if (!this.scene.get('SlidingPuzzleScene')) {
       this.scene.add('SlidingPuzzleScene', SlidingPuzzleScene);
@@ -52,6 +55,7 @@ export class GameScene extends Phaser.Scene {
 
     // Create ground
     this.createGround();
+
 
     // Create player at saved position
     this.createPlayer();
@@ -148,7 +152,7 @@ export class GameScene extends Phaser.Scene {
   }
 
 
-  createParallaxLayers(gameWidth, gameHeight) {
+  createBackground(gameWidth, gameHeight) {
     // Create ground texture if not exists
     if (!this.textures.exists('ground')) {
       this.add.graphics()
@@ -167,24 +171,13 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    // Sky layer (furthest back)
-    this.skyLayer = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'sky_bg')
+    // Single background layer - static, no parallax
+    this.backgroundLayer = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'sky_bg')
       .setOrigin(0, 0)
       .setScrollFactor(0)
-      .setScale(0.5)
       .setDepth(-5);
-
-    // Mountains layer
-    this.mountainLayer = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'mountains_bg')
-      .setOrigin(0, 0)
-      .setScrollFactor(0)
-      .setDepth(-4);
-
-    // Trees layer
-    this.treeLayer = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'trees_fg')
-      .setOrigin(0, 0)
-      .setScrollFactor(0)
-      .setDepth(-3);
+    
+    console.log('Single background layer created', this.backgroundLayer);
   }
 
   createGround() {
@@ -198,6 +191,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   createPlayer() {
+
+
+
+
+
     // Use saved position or default
     const startX = this.gameProgress.playerPosition.x;
     const startY = this.gameProgress.playerPosition.y;
@@ -205,6 +203,7 @@ export class GameScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(startX, startY, 'player').setScale(2.5);
     this.player.setBounce(0.2);
     this.player.setCollideWorldBounds(true);
+
 
     // Player physics
     this.physics.add.collider(this.player, this.ground);
@@ -240,6 +239,7 @@ export class GameScene extends Phaser.Scene {
 
       landmarkSprite.setData('landmarkData', landmark);
 
+
       // Check if landmark is completed
       const isCompleted = this.gameProgress.landmarksCompleted.includes(landmark.id);
       const isVisited = this.gameProgress.landmarksVisited.includes(landmark.id);
@@ -262,9 +262,11 @@ export class GameScene extends Phaser.Scene {
       this.add.text(
         landmark.x + landmark.width / 2,
         500 - landmark.height - 20,
+
         nameText,
         {
           fontSize: '14px',
+
           color: nameColor,
           fontWeight: isCompleted ? 'bold' : 'normal'
         }
@@ -290,9 +292,15 @@ export class GameScene extends Phaser.Scene {
         if (!this.gameProgress.landmarksVisited.includes(this.nearbyLandmarkData.id)) {
           this.gameProgress.landmarksVisited.push(this.nearbyLandmarkData.id);
           console.log(`Landmark visited: ${this.nearbyLandmarkData.name}`);
+          console.log(`Total visits: ${this.gameProgress.landmarksVisited.length}/${this.REQUIRED_VISITS}`);
+          
+          // Check if player has reached required visits
+          this.checkGameCompletion();
         }
 
         EventBus.emit('landmark-interaction', this.nearbyLandmarkData);
+
+
         this.launchSlidingPuzzle(this.nearbyLandmarkData);
       }
     });
@@ -329,6 +337,7 @@ export class GameScene extends Phaser.Scene {
   setupEventListeners() {
     // Listen for the puzzle to close so you can resume music
     EventBus.on('puzzle-closed', this.resumeAfterPuzzle, this);
+
     
     // Listen for puzzle completion
     EventBus.on('puzzle-completed', this.onPuzzleCompleted, this);
@@ -353,6 +362,9 @@ export class GameScene extends Phaser.Scene {
       
       // Show completion message
       this.showLandmarkCompletionMessage(this.nearbyLandmarkData);
+      
+      // Check if game is completed (in case this was the 5th visit)
+      this.checkGameCompletion();
     }
   }
 
@@ -380,6 +392,7 @@ export class GameScene extends Phaser.Scene {
     if (this.backgroundMusic && this.backgroundMusic.isPaused) {
       this.backgroundMusic.resume();
     }
+
     
     // Refresh landmark visuals to show completion status
     this.refreshLandmarkVisuals();
@@ -461,6 +474,14 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+
+
+
+
+
+
+
+
   // Event handler methods
   pauseGame() {
     this.scene.pause();
@@ -528,9 +549,6 @@ export class GameScene extends Phaser.Scene {
     // Update UI
     this.updateUI();
 
-    // Update parallax effect
-    this.updateParallax();
-
     // Emit player position for external components
     EventBus.emit('player-position-update', {
       x: this.player.x,
@@ -575,6 +593,7 @@ export class GameScene extends Phaser.Scene {
 
   updateUI() {
     if (this.nearbyLandmarkData) {
+
       const isCompleted = this.gameProgress.landmarksCompleted.includes(this.nearbyLandmarkData.id);
       const interactionText = isCompleted ? 
         'Already completed!' : 
@@ -587,13 +606,24 @@ export class GameScene extends Phaser.Scene {
       this.interactionText.setVisible(false);
     }
 
-    // Update game stats with progress
+
+
+    // Update game stats with progress and completion status
     const distance = Math.floor(this.player.x / 10);
+
+
     this.gameProgress.totalDistance = Math.max(this.gameProgress.totalDistance, distance);
     
     const landmarksVisited = this.gameProgress.landmarksVisited.length;
     const landmarksCompleted = this.gameProgress.landmarksCompleted.length;
-    const statsText = `Distance: ${distance}m | Visited: ${landmarksVisited}/${landmarks.length} | Completed: ${landmarksCompleted}/${landmarks.length}`;
+
+    
+    // Show progress towards completion
+    const progressText = landmarksVisited >= this.REQUIRED_VISITS ? 
+      '🎉 READY FOR QUIZ!' : 
+      `Progress: ${landmarksVisited}/${this.REQUIRED_VISITS} visits`;
+    
+    const statsText = `Distance: ${distance}m | Visited: ${landmarksVisited}/${landmarks.length} | Completed: ${landmarksCompleted}/${landmarks.length}\n${progressText}`;
 
     this.gameUI.setText(statsText);
 
@@ -601,30 +631,13 @@ export class GameScene extends Phaser.Scene {
     EventBus.emit('game-stats-update', {
       distance,
       landmarksVisited,
+
       landmarksCompleted,
       totalLandmarks: landmarks.length,
-      gameProgress: this.gameProgress
+
+      gameProgress: this.gameProgress,
+      readyForQuiz: landmarksVisited >= this.REQUIRED_VISITS
     });
-  }
-
-  updateParallax() {
-    // Update parallax layers based on camera position
-    const cameraX = this.cameras.main.scrollX;
-
-    // Sky moves very slowly
-    if (this.skyLayer) {
-      this.skyLayer.tilePositionX = cameraX * 0.1;
-    }
-
-    // Mountains move a bit faster
-    if (this.mountainLayer) {
-      this.mountainLayer.tilePositionX = cameraX * 0.3;
-    }
-
-    // Trees move faster (closer to camera)
-    if (this.treeLayer) {
-      this.treeLayer.tilePositionX = cameraX * 0.6;
-    }
   }
 
   shutdown() {
@@ -642,10 +655,8 @@ export class GameScene extends Phaser.Scene {
     // Remove keyboard listeners
     this.input.keyboard.off('keydown-SPACE');
 
-    // Destroy game objects
-    if (this.skyLayer) this.skyLayer.destroy();
-    if (this.mountainLayer) this.mountainLayer.destroy();
-    if (this.treeLayer) this.treeLayer.destroy();
+    // Destroy game objects - only single background layer now
+    if (this.backgroundLayer) this.backgroundLayer.destroy();
     if (this.landmarksGroup) this.landmarksGroup.destroy(true);
     if (this.player) this.player.destroy();
     if (this.interactionText) this.interactionText.destroy();
