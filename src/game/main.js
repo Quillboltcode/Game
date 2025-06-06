@@ -6,6 +6,7 @@ import { HoanKiemLakeScene } from './HoanKiemLakeScene.js';
 import { GameScene } from './GameScene.js';
 import { MainMenu } from './MainMenu.js';
 import { SlidingPuzzle } from './SlidingPuzzle.js';
+// import { ParallaxScene } from './ParallaxScene.js'; // Import the ParallaxTileSpriteScene
 // The main function that creates and returns the Phaser game instance
 export default function StartGame(parent) {
     const config = {
@@ -21,6 +22,7 @@ export default function StartGame(parent) {
             GameScene,
             MainMenu,
             SlidingPuzzle,
+            // ParallaxScene // Add the ParallaxTileSpriteScene to the scene array
             // Add other scenes as needed
         ],
         

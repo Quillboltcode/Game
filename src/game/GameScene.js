@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { EventBus } from './EventBus';
 import { landmarks } from '../data/landmark';
 import { SlidingPuzzle } from './SlidingPuzzle';
+import { DialogueSystem } from './DialogqueSystem';
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -15,7 +16,7 @@ export class GameScene extends Phaser.Scene {
     this.interactionText = null;
     this.gameUI = null;
     this.backgroundMusic = null;
-
+    this.dialogueSystem = null;
     // Multiple parallax background layers
     this.backgroundLayers = [];
 
@@ -23,9 +24,29 @@ export class GameScene extends Phaser.Scene {
     this.minimap = null;
     this.minimapBorder = null;
 
+    // Default configuration - can be overridden by init()
+    this.sceneConfig = {
+      backgroundMusic: 'backgroundMusic',
+      backgroundLayers: {
+        sky: 'sky_bg',
+        clouds: 'clouds_bg',
+        trees: 'trees_bg'
+      },
+      continueScene: 'WorldMapScene',
+      landmarkData: null, // Will use default landmarks if null
+      worldWidth: 4000,
+      worldHeight: 600,
+      playerStartPosition: { x: 512, y: 470 },
+      enableMinimap: true,
+      enableParallax: true,
+      musicVolume: 0.5,
+      requiredVisits: 4,
+
+    };
+
     // Game progress tracking
     this.gameProgress = {
-      playerPosition: { x: 512, y: 450 },
+      playerPosition: { x: 512, y: 470 },
       landmarksCompleted: [],
       landmarksVisited: [],
       totalDistance: 0,
@@ -33,8 +54,31 @@ export class GameScene extends Phaser.Scene {
       lastSaveTime: Date.now()
     };
 
-    this.REQUIRED_VISITS = 5;
     this.gameCompleted = false;
+    this.continueScene = null
+  }
+
+  init(data = {}) {
+    // Merge passed configuration with defaults
+    this.sceneConfig = {
+      ...this.sceneConfig,
+      ...data
+    };
+
+    // Set required visits from config
+    this.REQUIRED_VISITS = this.sceneConfig.requiredVisits;
+
+    // Override landmark data if provided
+    if (this.sceneConfig.landmarkData) {
+      this.customLandmarks = this.sceneConfig.landmarkData;
+    }
+
+    // Set player start position from config
+    if (this.sceneConfig.playerStartPosition) {
+      this.gameProgress.playerPosition = { ...this.sceneConfig.playerStartPosition };
+    }
+
+    console.log('GameScene initialized with config:', this.sceneConfig);
   }
 
   create() {
@@ -42,12 +86,18 @@ export class GameScene extends Phaser.Scene {
 
     const gameWidth = this.scale.width;
     const gameHeight = this.scale.height;
-    const worldWidth = 4000;
+    const worldWidth = this.sceneConfig.worldWidth;
+    const worldHeight = this.sceneConfig.worldHeight;
 
     this.physics.world.setBounds(0, 0, worldWidth, gameHeight);
 
-    // Create parallax background with multiple layers
-    this.createParallaxBackground(gameWidth, gameHeight, worldWidth);
+    // Create parallax background if enabled
+    if (this.sceneConfig.enableParallax) {
+      this.createParallaxBackground(gameWidth, gameHeight, worldWidth);
+    } else {
+      this.createSimpleBackground(gameWidth, gameHeight, worldWidth);
+    }
+    this.dialogueSystem = new DialogueSystem(this)
 
     if (!this.scene.get('SlidingPuzzleScene')) {
       this.scene.add('SlidingPuzzleScene', SlidingPuzzleScene);
@@ -59,10 +109,13 @@ export class GameScene extends Phaser.Scene {
     this.setupControls();
     this.createBackButton();
     this.createUI();
-
+    // this.createEndZone();
     // Setup camera and minimap
     this.setupCamera(worldWidth, gameHeight);
-    this.createMinimap(worldWidth, gameHeight);
+
+    if (this.sceneConfig.enableMinimap) {
+      this.createMinimap(worldWidth, gameHeight);
+    }
 
     this.startBackgroundMusic();
     this.setupEventListeners();
@@ -82,7 +135,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Create landmark textures for those without sprites
-    landmarks.forEach(landmark => {
+    const landmarksToUse = this.customLandmarks || landmarks;
+    landmarksToUse.forEach(landmark => {
       if (!landmark.sprite && !this.textures.exists(landmark.id)) {
         this.add.graphics()
           .fillStyle(landmark.color)
@@ -95,25 +149,48 @@ export class GameScene extends Phaser.Scene {
     this.backgroundLayers = [];
 
     // Layer 1: Far background (slowest) - Sky/Mountains
-    const farBg = this.add.tileSprite(0, 0, worldWidth * 2, gameHeight, 'sky_bg')
-      .setOrigin(0, 0)
-      .setScale(2)
-      .setScrollFactor(0.1) // Very slow movement
-      .setDepth(-10);
-    this.backgroundLayers.push({ sprite: farBg, speed: 0.1 });
+    if (this.sceneConfig.backgroundLayers.sky) {
+      for (let i = 1; i <= 5; i++) {
+        const skyImageKey = `sky_h${i}`;
+        
+        // Check if the image exists before creating the layer
+        if (this.textures.exists(skyImageKey)) {
+          const skyHeight = gameHeight * 0.4; // 60% of screen height
+          const scrollFactor = 0.1 + (i - 1) * 0.05; // Different scroll speeds: 0.1, 0.15, 0.2, 0.25, 0.3
+          
+          const skyLayer = this.add.tileSprite(0, 0, worldWidth * 2, skyHeight, skyImageKey)
+            .setOrigin(0, 0)
+            .setScale(1.5)
+            .setScrollFactor(scrollFactor)
+            .setDepth(-10 - i); // Each layer gets deeper depth
+          
+          // Optional: Add slight tint variation for depth effect
+          const tintValues = [0xFFFFFF, 0xF0F8FF, 0xE6F3FF, 0xDCEEFF, 0xD2E9FF];
+          if (tintValues[i - 1]) {
+            skyLayer.setTint(tintValues[i - 1]);
+          }
+          
+          this.backgroundLayers.push({ 
+            sprite: skyLayer, 
+            speed: scrollFactor,
+            name: `sky_layer_${i}`
+          });
+          
+          console.log(`Sky layer ${i} created with scroll factor ${scrollFactor}`);
+        } else {
+          console.warn(`Sky image ${skyImageKey} not found, skipping layer ${i}`);
+        }
+      }
+    }
 
-    // Layer 2: Mid background - Clouds/Hills
-    if (this.textures.exists('clouds_bg')) {
-      const midBg = this.add.tileSprite(0, 0, worldWidth * 1.5, gameHeight, 'clouds_bg')
-        .setOrigin(0, 0)
-        .setScrollFactor(0.3)
-        .setDepth(-8);
-      this.backgroundLayers.push({ sprite: midBg, speed: 0.3 });
+    // Layer 2: Mid background - Mountains positioned at landmark centers
+    if (this.sceneConfig.backgroundLayers.clouds) {
+      this.createMultipleMountainsPerLandmark(gameWidth, gameHeight, worldWidth);
     }
 
     // Layer 3: Near background - Trees/Rocks
-    if (this.textures.exists('trees_bg')) {
-      const nearBg = this.add.tileSprite(0, 0, worldWidth * 1.2, gameHeight, 'trees_bg')
+    if (this.sceneConfig.backgroundLayers.trees && this.textures.exists(this.sceneConfig.backgroundLayers.trees)) {
+      const nearBg = this.add.tileSprite(0, 0, worldWidth * 1.2, gameHeight, this.sceneConfig.backgroundLayers.trees)
         .setOrigin(0, 0)
         .setScrollFactor(0.6)
         .setDepth(-6);
@@ -124,6 +201,35 @@ export class GameScene extends Phaser.Scene {
     this.createBackgroundElements(worldWidth, gameHeight);
 
     console.log('Parallax background layers created:', this.backgroundLayers.length);
+  }
+
+  createSimpleBackground(gameWidth, gameHeight, worldWidth) {
+    // Simple solid color background
+    this.add.rectangle(worldWidth / 2, gameHeight / 2, worldWidth, gameHeight, 0x87CEEB);
+    console.log('Simple background created');
+  }
+
+  startEndGameDialogue() {
+    const dialogues = [
+      {
+        text: "Congratulations! You've visited all the landmarks and learned about Hanoi's rich history."
+      },
+      {
+        text: "Your journey through the ancient streets has come to an end, but the memories will last forever."
+      },
+      {
+        text: "Would you like to continue exploring or return to the main menu?",
+        action: {
+          type: 'changeScene',
+          scene: 'WorldMapScene', // or 'MainMenu'
+          text: 'Continue Journey'
+        }
+      }
+    ];
+
+    this.dialogueSystem.createDialogue(dialogues, () => {
+      console.log('Dialogue completed!');
+    });
   }
 
   createBackgroundElements(worldWidth, gameHeight) {
@@ -162,19 +268,21 @@ export class GameScene extends Phaser.Scene {
   }
   createBackButton() {
     // Position button at the same location as gameUI (16, 60) but offset it below
-    const backButton = this.add.rectangle(70, 120, 120, 40, 0xFF5722)
+    const backButton = this.add.rectangle(20, 50, 60, 40, 0xFF5722)
       .setOrigin(0, 0) // Same origin as gameUI
       .setScrollFactor(0) // Same scroll factor as gameUI
+      .setDepth(1000) // Above gameUI
       .setInteractive({ useHandCursor: true });
 
     console.log('Back button created');
 
-    const backLabel = this.add.text(75, 125, 'Back to Map', {
-      fontSize: '20px', // Smaller font to match UI style
+    const backLabel = this.add.text(20, 40, '←', {
+      fontSize: '50px', // Smaller font to match UI style
       fill: '#ffffff', // White text like other UI elements
       fontFamily: 'Inter, sans-serif'
     }).setOrigin(0, 0) // Same origin as gameUI
-      .setScrollFactor(0); // Same scroll factor as gameUI
+      .setScrollFactor(0) // Same scroll factor as gameUI
+      .setDepth(1001); // Above button
 
     backButton.on('pointerover', () => {
       backButton.setFillStyle(0xCC4419);
@@ -398,7 +506,10 @@ export class GameScene extends Phaser.Scene {
     if (this.player) this.player.destroy();
     if (this.interactionText) this.interactionText.destroy();
     if (this.gameUI) this.gameUI.destroy();
-
+    // Clean up dialogue system
+    if (this.dialogueSystem) {
+      this.dialogueSystem.forceClose();
+    }
     EventBus.emit('game-scene-shutdown');
     super.shutdown();
   }
@@ -456,7 +567,7 @@ export class GameScene extends Phaser.Scene {
 
   resetGameProgress() {
     this.gameProgress = {
-      playerPosition: { x: 512, y: 450 },
+      playerPosition: { x: 512, y: 460 },
       landmarksCompleted: [],
       landmarksVisited: [],
       totalDistance: 0,
@@ -492,26 +603,29 @@ export class GameScene extends Phaser.Scene {
   createLandmarks() {
     this.landmarksGroup = this.add.group();
 
-    landmarks.forEach(landmark => {
+    // Use custom landmarks if provided, otherwise use default
+    const landmarksToUse = this.customLandmarks || landmarks;
+
+    landmarksToUse.forEach(landmark => {
       let landmarkSprite;
 
       if (landmark.sprite) {
         landmarkSprite = this.physics.add.staticImage(
           landmark.x,
-          550 - landmark.height,
+          670 - landmark.height,
           landmark.id
         ).setOrigin(0, 1);
         landmarkSprite.setDisplaySize(landmark.width, landmark.height);
       } else {
         landmarkSprite = this.add.rectangle(
           landmark.x + landmark.width / 2,
-          500 - landmark.height / 2,
+          600 - landmark.height / 2,
           landmark.width,
           landmark.height,
           landmark.color
         );
       }
-
+      console.log(`Creating landmark: ${landmark.name} at (${landmark.x}, ${580 - landmark.height})`);
       landmarkSprite.setData('landmarkData', landmark);
 
       const isCompleted = this.gameProgress.landmarksCompleted.includes(landmark.id);
@@ -530,16 +644,16 @@ export class GameScene extends Phaser.Scene {
         landmarkSprite.setTint(0xFFE4B5);
       }
 
-      this.add.text(
-        landmark.x + landmark.width / 2,
-        500 - landmark.height - 20,
-        nameText,
-        {
-          fontSize: '14px',
-          color: nameColor,
-          fontWeight: isCompleted ? 'bold' : 'normal'
-        }
-      ).setOrigin(0.5);
+      // this.add.text(
+      //   landmark.x + landmark.width / 2,
+      //   620 - landmark.height - 20,
+      //   nameText,
+      //   {
+      //     fontSize: '14px',
+      //     color: nameColor,
+      //     fontWeight: isCompleted ? 'bold' : 'normal'
+      //   }
+      // ).setOrigin(0.5);
 
       this.landmarksGroup.add(landmarkSprite);
     });
@@ -669,10 +783,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   startBackgroundMusic() {
-    if (this.sound.get('backgroundMusic') === null) {
-      this.backgroundMusic = this.sound.add('backgroundMusic', {
+    const musicKey = this.sceneConfig.backgroundMusic;
+
+    if (this.sound.get(musicKey) === null && this.sound.get(musicKey)) {
+      this.backgroundMusic = this.sound.add(musicKey, {
         loop: true,
-        volume: 0.5
+        volume: this.sceneConfig.musicVolume
       });
 
       if (this.sound.locked) {
@@ -741,7 +857,7 @@ export class GameScene extends Phaser.Scene {
         landmarkSprite.y
       );
 
-      const interactionRadius = (landmarkData.width / 2) + 50;
+      const interactionRadius = (landmarkData.width / 2) + 100;
       if (distance < interactionRadius) {
         this.nearbyLandmarkData = landmarkData;
 
@@ -796,11 +912,98 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  createEndZone() {
+    // Create invisible end zone at the end of the map
+    this.endZone = this.add.zone(3800, 500, 200, 200); // x, y, width, height
+    this.physics.world.enable(this.endZone);
+    this.endZone.body.setImmovable(true);
+
+    // Optional: Add visual indicator (remove setVisible(false) to see it)
+    const endZoneVisual = this.add.rectangle(3800, 500, 200, 200, 0x00ff00, 0.3)
+      .setVisible(false); // Set to true for debugging
+
+    // Set up collision detection
+    this.physics.add.overlap(this.player, this.endZone, () => {
+      this.checkGameCompletion();
+    });
+  }
+
   checkGameCompletion() {
-    // Add your game completion logic here
-    if (this.gameProgress.landmarksVisited.length >= this.REQUIRED_VISITS && !this.gameCompleted) {
+    // Simply check if game is already completed to avoid multiple triggers
+    if (!this.gameCompleted) {
       this.gameCompleted = true;
+
+      // Start end game dialogue
+      this.startEndGameDialogue();
+
       EventBus.emit('game-completed', this.gameProgress);
     }
+  }
+
+  createMultipleMountainsPerLandmark(gameWidth, gameHeight, worldWidth) {
+    const landmarksToUse = this.customLandmarks || landmarks;
+    
+    if (!landmarksToUse || landmarksToUse.length === 0) return;
+
+    landmarksToUse.forEach((landmark, landmarkIndex) => {
+      // Create 2-3 mountains around each landmark
+      const mountainCount = 2 + (landmarkIndex % 2); // 2 or 3 mountains per landmark
+      
+      for (let i = 0; i < mountainCount; i++) {
+        const mountainIndex = ((landmarkIndex * mountainCount + i) % 5) + 1;
+        const mountainKey = `mountain_${mountainIndex}`;
+        
+        if (this.textures.exists(mountainKey)) {
+          // Calculate position relative to landmark
+          const offsetFromCenter = (i - Math.floor(mountainCount / 2)) * 150; // Spread mountains around landmark
+          const mountainX = landmark.x + (landmark.width / 2) + offsetFromCenter;
+          
+          // Vary mountain properties
+          const scrollFactor = 0.2 + (i * 0.15) + (landmarkIndex * 0.05);
+          const heightPercent = 0.5 + (i * 0.1);
+          const mountainHeight = gameHeight * heightPercent;
+          const mountainWidth = 200 + (i * 30);
+          
+          // DYNAMIC Y POSITIONING - Further mountains are higher, closer ones lower
+          const baseYOffset = 50; // Base offset from bottom
+          const layerYOffset = (mountainCount - i) * 0; // Further layers go higher
+          const randomYOffset = (Math.random() - 0.5) * 40; // Add some randomness
+          
+          const mountainY = gameHeight - mountainHeight - baseYOffset - layerYOffset + randomYOffset;
+          
+          // Ensure mountain doesn't go above screen
+          const finalMountainY = Math.max(0, Math.min(mountainY, gameHeight - mountainHeight));
+          
+          // Depth and visual effects
+          const depth = -8 + i;
+          const alpha = 0.8 + (i * 0.15);
+          const tintColors = [0xB0C4DE, 0x8FBC8F, 0x708090, 0x2F4F2F, 0x556B2F];
+          const tint = tintColors[i % tintColors.length];
+          
+          const mountainLayer = this.add.tileSprite(
+            mountainX,
+            finalMountainY,
+            mountainWidth,
+            mountainHeight,
+            mountainKey
+          )
+            .setOrigin(0, 0)
+            .setScrollFactor(scrollFactor)
+            .setScale(1.5, 1.5)
+            .setDisplaySize(mountainWidth, mountainHeight)
+            .setDepth(depth)
+            .setTint(tint)
+            .setAlpha(alpha);
+          
+          this.backgroundLayers.push({ 
+            sprite: mountainLayer, 
+            speed: scrollFactor,
+            name: `mountain_${i + 1}_at_${landmark.name.replace(/\s+/g, '_')}`,
+            landmarkId: landmark.id,
+            type: 'mountain'
+          });
+        }
+      }
+    });
   }
 }

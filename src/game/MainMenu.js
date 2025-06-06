@@ -3,9 +3,7 @@ import { Scene } from 'phaser';
 
 export class MainMenu extends Scene
 {
-    
-
-    constructor ()
+        constructor ()
     {
         super('MainMenu');
     }
@@ -43,7 +41,7 @@ export class MainMenu extends Scene
         }
 
         this.scene.start('WorldMapScene');
-        // this.scene.start('SlidingPuzzleScene');
+        // this.scene.start('ParallaxScene');
         EventBus.emit('change-scene', 'WorldMapScene');
     }
 

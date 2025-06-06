@@ -14,22 +14,44 @@ export class SlidingPuzzle extends Phaser.Scene {
         this.isComplete = false;
         this.startTime = 0;
         this.imageLoaded = false;
-        // Array of available puzzle images
-        this.puzzleImages = [
-            'lotus.webp',
-            'flag.webp',
-            'hcm.webp',
-            'kt.webp',
-            'uni.webp'
-            // Add more image filenames as needed
-        ];
+        this.landmarkData = null;
+        this.puzzleImagePath = null;
+        this.puzzleTextureKey = null; // Add unique texture key
+    }
 
+    init(data) {
+        // Receive data from GameScene
+        this.landmarkData = data.landmarkData;
+
+        // Get puzzle image path from landmark data
+        if (this.landmarkData && this.landmarkData.puzzle) {
+            this.puzzleImagePath = this.landmarkData.puzzle;
+            // Create unique texture key based on landmark ID and timestamp
+            this.puzzleTextureKey = `puzzle_${this.landmarkData.id}_${Date.now()}`;
+        } else {
+            // Fallback to default image if no puzzle specified
+            this.puzzleImagePath = 'assets/puzzle/default.webp';
+            this.puzzleTextureKey = `puzzle_default_${Date.now()}`;
+        }
+
+        console.log('Loading puzzle image:', this.puzzleImagePath);
+        console.log('Using texture key:', this.puzzleTextureKey);
     }
 
     preload() {
-        const randomImage = Phaser.Utils.Array.GetRandom(this.puzzleImages);
-        // Load the main puzzle image
-        this.load.image('puzzle_image', `assets/puzzle/${randomImage}`);
+        // Remove existing texture if it exists
+        if (this.textures.exists('puzzle_image')) {
+            this.textures.remove('puzzle_image');
+        }
+        
+        // Load the specific puzzle image with unique key
+        if (this.puzzleImagePath && this.puzzleTextureKey) {
+            this.load.image(this.puzzleTextureKey, this.puzzleImagePath);
+        } else {
+            // Fallback to a default image
+            this.puzzleTextureKey = `puzzle_default_${Date.now()}`;
+            this.load.image(this.puzzleTextureKey, 'assets/puzzle/default.webp');
+        }
 
         // Listen for load complete
         this.load.on('complete', () => {
@@ -90,7 +112,8 @@ export class SlidingPuzzle extends Phaser.Scene {
 
     createImageTiles() {
         try {
-            const puzzleTexture = this.textures.get('puzzle_image');
+            // Use the unique texture key instead of 'puzzle_image'
+            const puzzleTexture = this.textures.get(this.puzzleTextureKey);
             if (!puzzleTexture || !puzzleTexture.source[0]) {
                 console.error('Puzzle image not loaded properly');
                 return;
@@ -112,11 +135,12 @@ export class SlidingPuzzle extends Phaser.Scene {
                 const cropX = col * tileWidth;
                 const cropY = row * tileHeight;
 
-                // Create canvas for this tile
-                const canvas = this.createTileCanvas(cropX, cropY, tileWidth, tileHeight, 'puzzle_image');
+                // Create canvas for this tile with unique key
+                const canvas = this.createTileCanvas(cropX, cropY, tileWidth, tileHeight, this.puzzleTextureKey);
 
-                // Add texture to Phaser
-                this.textures.addCanvas(`image_tile_${i + 1}`, canvas);
+                // Add texture to Phaser with unique key
+                const tileTextureKey = `${this.puzzleTextureKey}_tile_${i + 1}`;
+                this.textures.addCanvas(tileTextureKey, canvas);
             }
         } catch (error) {
             console.error('Error creating image tiles:', error);
@@ -205,7 +229,7 @@ export class SlidingPuzzle extends Phaser.Scene {
             this.tiles = [];
         }
 
-        // Initialize tiles array with correct positions (1-15, then empty)
+        // Initialize tiles array with correct positions (1-8, then empty)
         for (let i = 0; i < 9; i++) {
             const row = Math.floor(i / this.gridSize);
             const col = i % this.gridSize;
@@ -213,8 +237,8 @@ export class SlidingPuzzle extends Phaser.Scene {
             const y = startY + row * (this.tileSize + this.gap);
 
             if (i < 8) {
-                // Image tiles
-                const tileKey = `image_tile_${i + 1}`;
+                // Use unique tile texture key
+                const tileKey = `${this.puzzleTextureKey}_tile_${i + 1}`;
 
                 // Check if texture exists, fallback to numbered if not
                 const textureKey = this.textures.exists(tileKey) ? tileKey : `tile_${i + 1}`;
@@ -223,7 +247,7 @@ export class SlidingPuzzle extends Phaser.Scene {
                     .setInteractive()
                     .setData('number', i + 1)
                     .setData('index', i)
-                    .setData('originalIndex', i); // Store original position for win checking
+                    .setData('originalIndex', i);
 
                 // Add hover effect
                 tile.on('pointerover', () => {
@@ -296,8 +320,9 @@ export class SlidingPuzzle extends Phaser.Scene {
     }
 
     showReferenceImage() {
-        if (this.textures.exists('puzzle_image')) {
-            const refImage = this.add.image(700, 150, 'puzzle_image')
+        // Use the unique texture key for reference image
+        if (this.textures.exists(this.puzzleTextureKey)) {
+            const refImage = this.add.image(700, 150, this.puzzleTextureKey)
                 .setScale(0.3)
                 .setAlpha(0.8);
 
@@ -527,5 +552,23 @@ export class SlidingPuzzle extends Phaser.Scene {
                 onComplete: () => star.destroy()
             });
         }
+    }
+
+    // Clean up textures when scene shuts down
+    shutdown() {
+        // Remove the textures to free memory
+        if (this.puzzleTextureKey && this.textures.exists(this.puzzleTextureKey)) {
+            this.textures.remove(this.puzzleTextureKey);
+        }
+        
+        // Remove tile textures
+        for (let i = 1; i <= 8; i++) {
+            const tileKey = `${this.puzzleTextureKey}_tile_${i}`;
+            if (this.textures.exists(tileKey)) {
+                this.textures.remove(tileKey);
+            }
+        }
+        
+        super.shutdown();
     }
 }

@@ -2,15 +2,12 @@ import { EventBus } from './EventBus';
 import { Scene } from 'phaser';
 import { landmarks } from '../data/landmark'; // Import landmarks data
 
-export class Preload extends Scene
-{
-    constructor ()
-    {
+export class Preload extends Scene {
+    constructor() {
         super('Preload');
     }
 
-    preload ()
-    {
+    preload() {
         // Create loading UI
         this.createLoadingUI();
 
@@ -25,33 +22,37 @@ export class Preload extends Scene
     }
 
     createLoadingUI() {
-        // Loading bar background
-        const loadingBarBg = this.add.rectangle(512, 384, 400, 20, 0x333333);
+        // Get actual screen dimensions
+        const centerX = this.scale.width / 2;
+        const centerY = this.scale.height / 2;
+
+        // Loading bar background - centered on screen
+        const loadingBarBg = this.add.rectangle(centerX, centerY, 400, 20, 0x333333);
         loadingBarBg.setStrokeStyle(2, 0xffffff);
-        
-        // Loading bar fill
-        this.loadingBar = this.add.rectangle(312, 384, 0, 16, 0x00ff00).setOrigin(0, 0.5);
-        
-        // Loading text
-        this.loadingText = this.add.text(512, 350, 'Loading Game Assets...', {
-            fontFamily: 'Arial Black', 
-            fontSize: 24, 
+
+        // Loading bar fill - positioned relative to background
+        this.loadingBar = this.add.rectangle(centerX - 200, centerY, 0, 16, 0x00ff00).setOrigin(0, 0.5);
+
+        // Loading text - positioned above the loading bar
+        this.loadingText = this.add.text(centerX, centerY - 50, 'Loading Game Assets...', {
+            fontFamily: 'Arial Black',
+            fontSize: 24,
             color: '#ffffff',
-            stroke: '#000000', 
+            stroke: '#000000',
             strokeThickness: 4
         }).setOrigin(0.5);
 
-        // Percentage text
-        this.percentText = this.add.text(512, 420, '0%', {
-            fontFamily: 'Arial', 
-            fontSize: 18, 
+        // Percentage text - positioned below the loading bar
+        this.percentText = this.add.text(centerX, centerY + 50, '0%', {
+            fontFamily: 'Arial',
+            fontSize: 18,
             color: '#ffffff'
         }).setOrigin(0.5);
 
-        // Asset loading status
-        this.statusText = this.add.text(512, 450, '', {
-            fontFamily: 'Arial', 
-            fontSize: 14, 
+        // Asset loading status - positioned below percentage
+        this.statusText = this.add.text(centerX, centerY + 80, '', {
+            fontFamily: 'Arial',
+            fontSize: 14,
             color: '#cccccc'
         }).setOrigin(0.5);
 
@@ -74,7 +75,7 @@ export class Preload extends Scene
         this.load.image('player_run', 'assets/player/char-ani/10.png');
         // Audio assets
         this.load.audio('backgroundMusic', 'assets/music.mp3');
-        
+
         // Parallax background layers
         this.load.image('sky_bg', './assets/layer/sky.jpg');
         this.load.image('mountains_bg', 'assets/layer/mount.png');
@@ -86,9 +87,18 @@ export class Preload extends Scene
         this.load.image('playButton_menu', './assets/play.png');
         this.load.image('settingsButton', './assets/setbtn2.png');
         this.load.image('logo', './assets/logo.png');
-        
+        // Load sky background images
+        for (let i = 1; i <= 5; i++) {
+            this.load.image(`sky_h${i}`, `assets/background/h${i}.png`);
+        }
 
-    }   
+        // Load mountain background images
+        for (let i = 1; i <= 5; i++) {
+            this.load.image(`mountain_${i}`, `assets/background/mountain${i}.png`);
+        }
+
+
+    }
 
     loadLandmarkAssets() {
         // Load landmark sprites
@@ -103,10 +113,10 @@ export class Preload extends Scene
     handleLoadingComplete() {
         this.load.on('complete', () => {
             this.statusText.setText('Creating textures...');
-            
+
             // Create procedural textures after loading is complete
             this.createProceduralTextures();
-            
+
             // Emit loading complete event
             EventBus.emit('preload-complete', {
                 landmarksCount: landmarks.length,
@@ -141,25 +151,24 @@ export class Preload extends Scene
         });
     }
 
-    create ()
-    {
+    create() {
         // Set background color
         this.cameras.main.setBackgroundColor('#1a1a2e');
-        
+
         // Add game title
         this.add.text(512, 200, 'Adventure Game', {
-            fontFamily: 'Arial Black', 
-            fontSize: 48, 
+            fontFamily: 'Arial Black',
+            fontSize: 48,
             color: '#ffffff',
-            stroke: '#000000', 
+            stroke: '#000000',
             strokeThickness: 8,
             align: 'center'
         }).setOrigin(0.5);
 
         // Add subtitle
         this.add.text(512, 260, 'Explore Ancient Landmarks', {
-            fontFamily: 'Arial', 
-            fontSize: 20, 
+            fontFamily: 'Arial',
+            fontSize: 20,
             color: '#cccccc',
             align: 'center'
         }).setOrigin(0.5);
