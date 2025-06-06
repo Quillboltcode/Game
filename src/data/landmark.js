@@ -25,16 +25,16 @@ export const landmarks = [
     sprite: 'bglake.png'
   },
   {
-    id: 'one-pillar-pagoda',
-    name: 'One Pillar Pagoda',
-    description: 'A historic Buddhist temple built to resemble a lotus blossom emerging from water.',
-    history: 'Constructed in 1049 by Emperor Ly Thai To after he dreamed of Goddess of Mercy, who handed him a baby son while seated on a lotus flower.',
+    id: 'long-bien-bridge',
+    name: 'Long Bien Bridge',
+    description: 'A historic cantilever bridge crossing the Red River, representing French colonial engineering and Vietnamese resilience.',
+    history: 'Built between 1899-1902 by French engineers, designed by Gustave Eiffel\'s company. Originally named Paul Doumer Bridge, it survived bombing during the Vietnam War and remains an iconic symbol of Hanoi\'s endurance.',
     x: 2200,
-    width: 80,
-    height: 120,
-    color: 0xDAA520,
-    year: '1049 AD',
-    sprite: 'bgpagoda.png'
+    width: 120,
+    height: 80,
+    color: 0x8B4513,
+    year: '1902 AD',
+    sprite: ''
   },
   {
     id: 'hanoi-opera-house',

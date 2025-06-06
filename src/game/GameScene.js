@@ -57,6 +57,7 @@ export class GameScene extends Phaser.Scene {
     this.createPlayer();
     this.createLandmarks();
     this.setupControls();
+    this.createBackButton();
     this.createUI();
 
     // Setup camera and minimap
@@ -96,6 +97,7 @@ export class GameScene extends Phaser.Scene {
     // Layer 1: Far background (slowest) - Sky/Mountains
     const farBg = this.add.tileSprite(0, 0, worldWidth * 2, gameHeight, 'sky_bg')
       .setOrigin(0, 0)
+      .setScale(2)
       .setScrollFactor(0.1) // Very slow movement
       .setDepth(-10);
     this.backgroundLayers.push({ sprite: farBg, speed: 0.1 });
@@ -157,6 +159,36 @@ export class GameScene extends Phaser.Scene {
 
     // Store reference for minimap setup
     this.backgroundElements = bgElementsGroup;
+  }
+  createBackButton() {
+    // Position button at the same location as gameUI (16, 60) but offset it below
+    const backButton = this.add.rectangle(70, 120, 120, 40, 0xFF5722)
+      .setOrigin(0, 0) // Same origin as gameUI
+      .setScrollFactor(0) // Same scroll factor as gameUI
+      .setInteractive({ useHandCursor: true });
+
+    console.log('Back button created');
+
+    const backLabel = this.add.text(75, 125, 'Back to Map', {
+      fontSize: '20px', // Smaller font to match UI style
+      fill: '#ffffff', // White text like other UI elements
+      fontFamily: 'Inter, sans-serif'
+    }).setOrigin(0, 0) // Same origin as gameUI
+      .setScrollFactor(0); // Same scroll factor as gameUI
+
+    backButton.on('pointerover', () => {
+      backButton.setFillStyle(0xCC4419);
+    });
+    backButton.on('pointerout', () => {
+      backButton.setFillStyle(0xFF5722);
+    });
+    backButton.on('pointerdown', () => {
+      this.scene.start('WorldMapScene');
+    });
+
+    // Store references if you need them later
+    this.backButton = backButton;
+    this.backLabel = backLabel;
   }
 
   createMinimap(worldWidth, gameHeight) {
@@ -236,6 +268,16 @@ export class GameScene extends Phaser.Scene {
       this.player.setVelocityY(-500);
       EventBus.emit('player-jumped');
     }
+
+    // // Update back button position to follow player
+    // if (this.backButton && this.backLabel && this.player) {
+    //   // Position button above and to the right of player
+    //   const buttonX = this.player.x + 100; // 100 pixels to the right of player
+    //   const buttonY = this.player.y - 100; // 100 pixels above player
+
+    //   this.backButton.setPosition(buttonX, buttonY);
+    //   this.backLabel.setPosition(buttonX, buttonY);
+    // }
 
     // Update minimap to follow player
     if (this.minimap && this.player) {

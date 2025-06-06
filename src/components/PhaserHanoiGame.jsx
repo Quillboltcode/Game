@@ -238,8 +238,9 @@ export const PhaserHanoiGame = () => {
             {/* Instructions */}
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-black bg-opacity-70 text-white p-3 rounded-lg text-center">
                 <div className="text-sm">
-                    <div>Use ARROW KEYS or WASD to move • Double SPACE to jump or interact</div>
-                    <div>Use S to save, use P to Pause </div>
+                    <div>Use ARROW KEYS or WASD to move • Double SPACE interact </div>
+                    <div>Use S to save • P to Pause • SHIFT+ R to reset • use M to hide minimap</div>
+                    <div></div>
                 </div>
             </div>
             

@@ -70,7 +70,7 @@ export class Preload extends Scene
     loadGameAssets() {
         // Player assets
         this.load.image('player', 'assets/player/char-ani/6.png');
-        this.load.image('player_idle', 'assets/char-ani/6.png');
+        // this.load.image('player_idle', 'assets/char-ani/6.png');
         this.load.image('player_run', 'assets/player/char-ani/10.png');
         // Audio assets
         this.load.audio('backgroundMusic', 'assets/music.mp3');

@@ -78,15 +78,16 @@ export class WorldMapScene extends Phaser.Scene {
       fontFamily: 'Inter, sans-serif'
     }).setOrigin(0.5);
 
-    // Interactive Landmark Markers
-    this.createLandmarkButton(200, 250, 'Temple of Literature', 'TempleOfLiteratureScene', 0xCCFFCC);
-    this.createLandmarkButton(200, 500, 'One Pillar Pagoda', 'OnePillarPagodaScene', 0xFFCCCC);
-    this.createLandmarkButton(650, 150, 'Long Biên Bridge', 'LongBienBridgeScene', 0xCCDDFF);
-    this.createLandmarkButton(400, 200, 'Hoàn Kiếm Lake', 'HoanKiemLakeScene', 0xFFFFCC);
-    this.createLandmarkButton(600, 450, 'Old Quarter', 'OldQuarterScene', 0xCCCCFF);
+    // Interactive Landmark Markers This could be to has more description about each landmark
+    // Remove for visual clarity
+    // this.createLandmarkButton(200, 250, 'Temple of Literature', 'TempleOfLiteratureScene', 0xCCFFCC);
+    // this.createLandmarkButton(200, 500, 'One Pillar Pagoda', 'OnePillarPagodaScene', 0xFFCCCC);
+    // this.createLandmarkButton(650, 150, 'Long Biên Bridge', 'LongBienBridgeScene', 0xCCDDFF);
+    // this.createLandmarkButton(400, 200, 'Hoàn Kiếm Lake', 'HoanKiemLakeScene', 0xFFFFCC);
+    // this.createLandmarkButton(600, 450, 'Old Quarter', 'OldQuarterScene', 0xCCCCFF);
     
     // Add button to go to your existing GameScene
-    this.createLandmarkButton(400, 350, 'Adventure Mode', 'GameScene', 0xFFCC99);
+    this.createLandmarkButton(400, 350, 'HaNoi Journey', 'GameScene', 0xFFCC99);
 
     // Options button
     this.add.text(this.cameras.main.width - 150, this.cameras.main.height - 50, 'Options', {
