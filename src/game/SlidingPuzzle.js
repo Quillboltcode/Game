@@ -30,7 +30,7 @@ export class SlidingPuzzle extends Phaser.Scene {
             this.puzzleTextureKey = `puzzle_${this.landmarkData.id}_${Date.now()}`;
         } else {
             // Fallback to default image if no puzzle specified
-            this.puzzleImagePath = 'assets/puzzle/default.webp';
+            this.puzzleImagePath = './assets/background/mountain1.png';
             this.puzzleTextureKey = `puzzle_default_${Date.now()}`;
         }
 
@@ -50,7 +50,7 @@ export class SlidingPuzzle extends Phaser.Scene {
         } else {
             // Fallback to a default image
             this.puzzleTextureKey = `puzzle_default_${Date.now()}`;
-            this.load.image(this.puzzleTextureKey, 'assets/puzzle/default.webp');
+            this.load.image(this.puzzleTextureKey, './assets/background/mountain1.png');
         }
 
         // Listen for load complete

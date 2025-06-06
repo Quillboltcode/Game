@@ -11,7 +11,7 @@ export const landmarks = [
     color: 0x8B4513,
     year: '1070 AD',
     sprite: '/landmarks/IMG_2856.PNG',
-    puzzle: 'public/assets/puzzle/uni.webp'
+    puzzle: './assets/puzzle/uni.webp'
   },
   {
     id: 'hoan-kiem-lake',
@@ -24,7 +24,7 @@ export const landmarks = [
     color: 0x4682B4,
     year: '15th Century',
     sprite: '/landmarks/IMG_2856.PNG',
-    puzzle: 'public/assets/puzzle/hcm.webp'
+    puzzle: './assets/puzzle/hcm.webp'
   },
   {
     id: 'long-bien-bridge',
