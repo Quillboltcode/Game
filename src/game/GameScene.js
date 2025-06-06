@@ -149,43 +149,22 @@ export class GameScene extends Phaser.Scene {
     this.backgroundLayers = [];
 
     // Layer 1: Far background (slowest) - Sky/Mountains
-    if (this.sceneConfig.backgroundLayers.sky) {
-      for (let i = 1; i <= 5; i++) {
-        const skyImageKey = `sky_h${i}`;
-        
-        // Check if the image exists before creating the layer
-        if (this.textures.exists(skyImageKey)) {
-          const skyHeight = gameHeight * 0.4; // 60% of screen height
-          const scrollFactor = 0.1 + (i - 1) * 0.05; // Different scroll speeds: 0.1, 0.15, 0.2, 0.25, 0.3
-          
-          const skyLayer = this.add.tileSprite(0, 0, worldWidth * 2, skyHeight, skyImageKey)
-            .setOrigin(0, 0)
-            .setScale(1.5)
-            .setScrollFactor(scrollFactor)
-            .setDepth(-10 - i); // Each layer gets deeper depth
-          
-          // Optional: Add slight tint variation for depth effect
-          const tintValues = [0xFFFFFF, 0xF0F8FF, 0xE6F3FF, 0xDCEEFF, 0xD2E9FF];
-          if (tintValues[i - 1]) {
-            skyLayer.setTint(tintValues[i - 1]);
-          }
-          
-          this.backgroundLayers.push({ 
-            sprite: skyLayer, 
-            speed: scrollFactor,
-            name: `sky_layer_${i}`
-          });
-          
-          console.log(`Sky layer ${i} created with scroll factor ${scrollFactor}`);
-        } else {
-          console.warn(`Sky image ${skyImageKey} not found, skipping layer ${i}`);
-        }
-      }
+    if (this.sceneConfig.backgroundLayers.sky && this.textures.exists(this.sceneConfig.backgroundLayers.sky)) {
+      const farBg = this.add.tileSprite(0, 0, worldWidth * 2, gameHeight, this.sceneConfig.backgroundLayers.sky)
+        .setOrigin(0, 0)
+        .setScale(2)
+        .setScrollFactor(0.1)
+        .setDepth(-10);
+      this.backgroundLayers.push({ sprite: farBg, speed: 0.1 });
     }
 
-    // Layer 2: Mid background - Mountains positioned at landmark centers
-    if (this.sceneConfig.backgroundLayers.clouds) {
-      this.createMultipleMountainsPerLandmark(gameWidth, gameHeight, worldWidth);
+    // Layer 2: Mid background - Clouds/Hills
+    if (this.sceneConfig.backgroundLayers.clouds && this.textures.exists(this.sceneConfig.backgroundLayers.clouds)) {
+      const midBg = this.add.tileSprite(0, 0, worldWidth * 1.5, gameHeight, this.sceneConfig.backgroundLayers.clouds)
+        .setOrigin(0, 0)
+        .setScrollFactor(0.3)
+        .setDepth(-8);
+      this.backgroundLayers.push({ sprite: midBg, speed: 0.3 });
     }
 
     // Layer 3: Near background - Trees/Rocks
@@ -938,72 +917,5 @@ export class GameScene extends Phaser.Scene {
 
       EventBus.emit('game-completed', this.gameProgress);
     }
-  }
-
-  createMultipleMountainsPerLandmark(gameWidth, gameHeight, worldWidth) {
-    const landmarksToUse = this.customLandmarks || landmarks;
-    
-    if (!landmarksToUse || landmarksToUse.length === 0) return;
-
-    landmarksToUse.forEach((landmark, landmarkIndex) => {
-      // Create 2-3 mountains around each landmark
-      const mountainCount = 2 + (landmarkIndex % 2); // 2 or 3 mountains per landmark
-      
-      for (let i = 0; i < mountainCount; i++) {
-        const mountainIndex = ((landmarkIndex * mountainCount + i) % 5) + 1;
-        const mountainKey = `mountain_${mountainIndex}`;
-        
-        if (this.textures.exists(mountainKey)) {
-          // Calculate position relative to landmark
-          const offsetFromCenter = (i - Math.floor(mountainCount / 2)) * 150; // Spread mountains around landmark
-          const mountainX = landmark.x + (landmark.width / 2) + offsetFromCenter;
-          
-          // Vary mountain properties
-          const scrollFactor = 0.2 + (i * 0.15) + (landmarkIndex * 0.05);
-          const heightPercent = 0.5 + (i * 0.1);
-          const mountainHeight = gameHeight * heightPercent;
-          const mountainWidth = 200 + (i * 30);
-          
-          // DYNAMIC Y POSITIONING - Further mountains are higher, closer ones lower
-          const baseYOffset = 50; // Base offset from bottom
-          const layerYOffset = (mountainCount - i) * 0; // Further layers go higher
-          const randomYOffset = (Math.random() - 0.5) * 40; // Add some randomness
-          
-          const mountainY = gameHeight - mountainHeight - baseYOffset - layerYOffset + randomYOffset;
-          
-          // Ensure mountain doesn't go above screen
-          const finalMountainY = Math.max(0, Math.min(mountainY, gameHeight - mountainHeight));
-          
-          // Depth and visual effects
-          const depth = -8 + i;
-          const alpha = 0.8 + (i * 0.15);
-          const tintColors = [0xB0C4DE, 0x8FBC8F, 0x708090, 0x2F4F2F, 0x556B2F];
-          const tint = tintColors[i % tintColors.length];
-          
-          const mountainLayer = this.add.tileSprite(
-            mountainX,
-            finalMountainY,
-            mountainWidth,
-            mountainHeight,
-            mountainKey
-          )
-            .setOrigin(0, 0)
-            .setScrollFactor(scrollFactor)
-            .setScale(1.5, 1.5)
-            .setDisplaySize(mountainWidth, mountainHeight)
-            .setDepth(depth)
-            .setTint(tint)
-            .setAlpha(alpha);
-          
-          this.backgroundLayers.push({ 
-            sprite: mountainLayer, 
-            speed: scrollFactor,
-            name: `mountain_${i + 1}_at_${landmark.name.replace(/\s+/g, '_')}`,
-            landmarkId: landmark.id,
-            type: 'mountain'
-          });
-        }
-      }
-    });
   }
 }
