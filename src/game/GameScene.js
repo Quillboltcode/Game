@@ -422,7 +422,7 @@ export class GameScene extends Phaser.Scene {
         if (!this.gameProgress.landmarksVisited.includes(this.nearbyLandmarkData.id)) {
           this.gameProgress.landmarksVisited.push(this.nearbyLandmarkData.id);
           console.log(`Landmark visited: ${this.nearbyLandmarkData.name}`);
-          this.checkGameCompletion();
+          // this.checkGameCompletion();
         }
 
         EventBus.emit('landmark-interaction', this.nearbyLandmarkData);
@@ -669,7 +669,7 @@ export class GameScene extends Phaser.Scene {
 
       this.saveGameProgress();
       this.showLandmarkCompletionMessage(this.nearbyLandmarkData);
-      this.checkGameCompletion();
+      // this.checkGameCompletion();
     }
   }
 
